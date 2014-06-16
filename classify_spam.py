@@ -11,13 +11,12 @@ import numpy as np
 from optparse import OptionParser
 import sys
 from time import time
-import pylab as pl
 
+import pickle
 import json
 import os
 from omnihack import enumerator
 
-# from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.feature_selection import SelectKBest, chi2
@@ -27,7 +26,7 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.linear_model import Perceptron
 from sklearn.linear_model import PassiveAggressiveClassifier
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB
-from sklearn.neighbors import KNeighborsClassifier
+# from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neighbors import NearestCentroid
 from sklearn.utils.extmath import density
 from sklearn import metrics
@@ -65,11 +64,15 @@ op.add_option("--filtered",
                    "headers, signatures, and quoting.")
 op.add_option("--data_dir", type=str,
               help="data directory")
+op.add_option("--output", type=str,
+              help="output path")
 
 
 (opts, args) = op.parse_args()
 if opts.data_dir is None:
     op.error('Data directory not given')
+if opts.output is None:
+    op.error('Output path not given')
 
 if len(args) > 0:
     op.error("this script takes no arguments.")
@@ -260,8 +263,9 @@ for penalty in ["l2", "l1"]:
     results.append(benchmark(
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
         "LinearSVC (" + penalty.upper() + " penalty)"))
-    results.append(benchmark(SGDClassifier(alpha=.0001, n_iter=50, penalty=penalty),
-                   "SGD (" + penalty.upper() + " penalty)"))
+    results.append(benchmark(
+        SGDClassifier(alpha=.0001, n_iter=50, penalty=penalty),
+        "SGD (" + penalty.upper() + " penalty)"))
 
 # Train SGD with Elastic Net penalty
 print('=' * 80)
@@ -302,33 +306,5 @@ results.append(benchmark(L1LinearSVC(),
                "LinearSVC (L1 feature select)"))
 
 
-# make some plots
-
-indices = np.arange(len(results))
-
-results = [[x[i] for x in results] for i in range(4)]
-
-clf_names, score, training_time, test_time = results
-training_time = np.array(training_time) / np.max(training_time)
-test_time = np.array(test_time) / np.max(test_time)
-
-fig = pl.figure()
-pl.figure(figsize=(12, 8))
-pl.title("Score")
-pl.barh(indices, score, .2, label="score", color='r')
-pl.barh(indices + .3, training_time, .2, label="training time", color='g')
-pl.barh(indices + .6, test_time, .2, label="test time", color='b')
-pl.yticks(())
-
-#box = pl.get_position()
-#pl.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-
-pl.legend(bbox_to_anchor=(1.2, 1.00)) #loc='best')
-pl.subplots_adjust(left=.25)
-pl.subplots_adjust(top=.95)
-pl.subplots_adjust(bottom=.05)
-
-for i, c in zip(indices, clf_names):
-    pl.text(-.3, i, c)
-
-pl.show()
+with open(opts.output, 'w') as f:
+    pickle.dump(results, f)
