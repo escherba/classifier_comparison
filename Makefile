@@ -9,7 +9,7 @@ fit_metrics.pickle: classify.py
 		--output fit_metrics.pickle
 
 grid_search:
-	python grid_search_text_feature_extraction.py \
+	python grid_search.py \
 		--data_dir /Users/escherba/dev/py-nlp/var/corpora/livefyre
 
 clean:
