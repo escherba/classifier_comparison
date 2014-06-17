@@ -79,10 +79,6 @@ if len(args) > 0:
     op.error("this script takes no arguments.")
     sys.exit(1)
 
-print(__doc__)
-op.print_help()
-print()
-
 
 def get_files(dirname, extension=".txt"):
     for root, dirs, files in os.walk(dirname):
