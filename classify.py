@@ -1,7 +1,8 @@
-# Author: Peter Prettenhofer <peter.prettenhofer@gmail.com>
-#         Olivier Grisel <olivier.grisel@ensta.org>
-#         Mathieu Blondel <mathieu@mblondel.org>
-#         Lars Buitinck <L.J.Buitinck@uva.nl>
+# Adapted by:       Eugene Scherba <escherba@gmail.com>
+# Original Authors: Peter Prettenhofer <peter.prettenhofer@gmail.com>
+#                   Olivier Grisel <olivier.grisel@ensta.org>
+#                   Mathieu Blondel <mathieu@mblondel.org>
+#                   Lars Buitinck <L.J.Buitinck@uva.nl>
 # License: BSD 3 clause
 
 from __future__ import print_function
@@ -263,6 +264,33 @@ for penalty in ["l2", "l1"]:
     results.append(benchmark(
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
         "LinearSVC (" + penalty.upper() + " penalty)"))
+
+class L1LinearSVC(LinearSVC):
+
+    def fit(self, X, y):
+        # The smaller C, the stronger the regularization.
+        # The more regularization, the more sparsity.
+        self.transformer_ = LinearSVC(C=0.5,
+                                      penalty="l1",
+                                      dual=False,
+                                      tol=1e-3)
+        X = self.transformer_.fit_transform(X, y)
+        print(X.shape)
+        return LinearSVC.fit(self, X, y)
+
+    def predict(self, X):
+        X = self.transformer_.transform(X)
+        return LinearSVC.predict(self, X)
+
+print('=' * 80)
+print("LinearSVC with L1-based feature selection")
+results.append(benchmark(L1LinearSVC(),
+               "LinearSVC (L1 feature select)"))
+
+
+for penalty in ["l2", "l1"]:
+    print('=' * 80)
+    print("%s penalty" % penalty.upper())
     results.append(benchmark(
         SGDClassifier(alpha=.0001, n_iter=50, penalty=penalty),
         "SGD (" + penalty.upper() + " penalty)"))
@@ -285,25 +313,6 @@ print("Naive Bayes")
 results.append(benchmark(MultinomialNB(alpha=.01)))
 results.append(benchmark(BernoulliNB(alpha=.01)))
 
-
-class L1LinearSVC(LinearSVC):
-
-    def fit(self, X, y):
-        # The smaller C, the stronger the regularization.
-        # The more regularization, the more sparsity.
-        self.transformer_ = LinearSVC(penalty="l1",
-                                      dual=False, tol=1e-3)
-        X = self.transformer_.fit_transform(X, y)
-        return LinearSVC.fit(self, X, y)
-
-    def predict(self, X):
-        X = self.transformer_.transform(X)
-        return LinearSVC.predict(self, X)
-
-print('=' * 80)
-print("LinearSVC with L1-based feature selection")
-results.append(benchmark(L1LinearSVC(),
-               "LinearSVC (L1 feature select)"))
 
 
 with open(opts.output, 'w') as f:
