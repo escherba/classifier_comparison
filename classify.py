@@ -13,7 +13,7 @@ from optparse import OptionParser
 import sys
 from time import time
 
-import pickle
+import csv
 import json
 import os
 from omnihack import enumerator
@@ -24,6 +24,7 @@ from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.linear_model import RidgeClassifier
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import Perceptron
 from sklearn.linear_model import PassiveAggressiveClassifier
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB
@@ -80,7 +81,7 @@ if len(args) > 0:
     sys.exit(1)
 
 
-def get_files(dirname, extension=".txt"):
+def get_files(dirname, extension=".source"):
     for root, dirs, files in os.walk(dirname):
         for fname in files:
             if fname.endswith(extension):
@@ -106,6 +107,7 @@ def get_data_frames(dirname, get_data, train_test_ratio=0.75):
     y_testing = []
     fnames = get_files(dirname)
     for fname in fnames:
+        print("Using file " + fname)
         file_data = []
         with open(fname) as f:
             for line in f:
@@ -242,7 +244,7 @@ def benchmark(clf, clf_descr=None):
     return clf_descr, score, train_time, test_time
 
 
-results = []
+results = [["Classifier", "Score", "Train.Time", "Test.Time"]]
 for clf, name in (
         (RidgeClassifier(tol=1e-2, solver="lsqr"), "Ridge Classifier"),
         (Perceptron(n_iter=50), "Perceptron"),
@@ -261,17 +263,19 @@ for penalty in ["l2", "l1"]:
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
         "LinearSVC (" + penalty.upper() + " penalty)"))
 
+
 class L1LinearSVC(LinearSVC):
 
     def fit(self, X, y):
         # The smaller C, the stronger the regularization.
         # The more regularization, the more sparsity.
-        self.transformer_ = LinearSVC(C=0.5,
+        self.transformer_ = LinearSVC(C=0.2,
                                       penalty="l1",
                                       dual=False,
                                       tol=1e-3)
+        print("before feture selection: " + str(X.shape))
         X = self.transformer_.fit_transform(X, y)
-        print(X.shape)
+        print("after feature selection: " + str(X.shape))
         return LinearSVC.fit(self, X, y)
 
     def predict(self, X):
@@ -287,15 +291,49 @@ results.append(benchmark(L1LinearSVC(),
 for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("%s penalty" % penalty.upper())
+    # Train Liblinear model
     results.append(benchmark(
-        SGDClassifier(alpha=.0001, n_iter=50, penalty=penalty),
+        LogisticRegression(penalty=penalty, dual=False, tol=1e-3),
+        "LogisticRegression (" + penalty.upper() + " penalty)"))
+
+class L1Logistic(LogisticRegression):
+
+    def fit(self, X, y):
+        # The smaller C, the stronger the regularization.
+        # The more regularization, the more sparsity.
+        self.transformer_ = LogisticRegression(C=0.2,
+                                      penalty="l1",
+                                      dual=False,
+                                      tol=1e-3)
+        print("before feture selection: " + str(X.shape))
+        X = self.transformer_.fit_transform(X, y)
+        print("after feature selection: " + str(X.shape))
+        return LogisticRegression.fit(self, X, y)
+
+    def predict(self, X):
+        X = self.transformer_.transform(X)
+        return LogisticRegression.predict(self, X)
+
+
+print('=' * 80)
+print("LogisticRegression with L1-based feature selection")
+results.append(benchmark(L1LinearSVC(),
+               "LogisticRegression (L1 feature select)"))
+
+
+
+for penalty in ["l2", "l1"]:
+    print('=' * 80)
+    print("%s penalty" % penalty.upper())
+    results.append(benchmark(
+        SGDClassifier(loss='hinge', alpha=.0001, n_iter=50, penalty=penalty),
         "SGD (" + penalty.upper() + " penalty)"))
 
 # Train SGD with Elastic Net penalty
 print('=' * 80)
 print("Elastic-Net penalty")
 results.append(benchmark(
-    SGDClassifier(alpha=.0001, n_iter=50, penalty="elasticnet"),
+    SGDClassifier(loss='hinge', alpha=.0001, n_iter=50, penalty="elasticnet"),
     "SGD w/ elastic-net penalty"))
 
 # Train NearestCentroid without threshold
@@ -311,5 +349,7 @@ results.append(benchmark(BernoulliNB(alpha=.01)))
 
 
 
-with open(opts.output, 'w') as f:
-    pickle.dump(results, f)
+with open(opts.output, 'wb') as csvfile:
+    writer = csv.writer(csvfile, delimiter=",",
+                        quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+    writer.writerows(results)

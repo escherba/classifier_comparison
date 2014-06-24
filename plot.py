@@ -1,12 +1,16 @@
-import pickle
+import csv
 import pylab as pl
 import numpy as np
 import sys
 
-results = None
-with open(sys.argv[1], 'r') as f:
-    results = pickle.load(f)
+results = []
+with open(sys.argv[1], 'r') as csvfile:
+    reader = csv.reader(csvfile, delimiter=',',
+                        quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+    for row in reader:
+        results.append(row)
 
+results = results[1:]
 indices = np.arange(len(results))
 
 results = [[x[i] for x in results] for i in range(4)]
@@ -27,10 +31,12 @@ pl.yticks(())
 #box = pl.get_position()
 #pl.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
-pl.legend(bbox_to_anchor=(1.17, 1.00)) #loc='best')
+pl.legend(bbox_to_anchor=(1.17, 1.00))  # loc='best')
 pl.subplots_adjust(left=.25)
 pl.subplots_adjust(top=.95)
 pl.subplots_adjust(bottom=.05)
+
+pl.grid(b=None, which='major', axis='both')
 
 for i, c in zip(indices, clf_names):
     pl.text(-.3, i, c)
