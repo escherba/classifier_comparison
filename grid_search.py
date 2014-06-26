@@ -9,18 +9,16 @@ from pprint import pprint
 from time import time
 import logging
 import sys
-import os
 import json
 
-import numpy as np
-from omnihack import enumerator
 from optparse import OptionParser
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer
+#from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.linear_model import SGDClassifier
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
-from sklearn.datasets.base import Bunch
+
+from lfcorpus_utils import get_data_frame
 
 op = OptionParser()
 op.add_option("--data_dir", type=str,
@@ -39,73 +37,7 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s')
 
 
-def get_files(dirname, extension=".txt"):
-    for root, dirs, files in os.walk(dirname):
-        for fname in files:
-            if fname.endswith(extension):
-                yield os.path.join(root, fname)
-
-
-def get_category(fname):
-    return os.path.basename(os.path.splitext(fname)[0])
-
-
-def get_data_frame(dirname, get_data):
-    category_codes = enumerator()
-    x_nested = []
-    y_nested = []
-    fnames = [fn for fn in get_files(dirname)]
-    num_files = len(fnames)
-    max_num_lines = 0
-    for fname in fnames:
-        file_data = []
-        num_lines = 0
-        with open(fname) as f:
-            for line in f:
-                file_data.append(get_data(line))
-                num_lines += 1
-
-        if num_lines > max_num_lines:
-            max_num_lines = num_lines
-
-        category_code = category_codes[get_category(fname)]
-        categories = [category_code] * len(file_data)
-        x_nested.append(file_data)
-        y_nested.append(categories)
-
-    # intersperse
-    x_final = []
-    y_final = []
-    for j in range(0, max_num_lines):
-        for i in range(0, num_files):
-            try:
-                x_final.append(x_nested[i][j])
-                y_final.append(y_nested[i][j])
-            except:
-                continue
-
-    return Bunch(
-        DESCR="complete set",
-        data=x_final,
-        target=np.array(y_final),
-        target_names=category_codes.keys(),
-        filenames=fnames
-    )
-
-###############################################################################
-# Load some categories from the training set
-#categories = [
-#    'alt.atheism',
-#    'talk.religion.misc',
-#]
-# Uncomment the following to do the analysis on all the categories
-#categories = None
-
-#print("Loading 20 newsgroups dataset for categories:")
-#print(categories)
-
 #data = fetch_20newsgroups(subset='train', categories=categories)
-
 data = get_data_frame(
     opts.data_dir,
     lambda line: json.loads(line)['content'])
@@ -120,21 +52,24 @@ print()
 # define a pipeline combining a text feature extractor with a simple
 # classifier
 pipeline = Pipeline([
-    ('vect', CountVectorizer()),
-    ('tfidf', TfidfTransformer()),
-    ('clf', SGDClassifier()),
+    ('vect', CountVectorizer(lowercase=True, stop_words="english")),
+    #('tfidf', TfidfTransformer()),
+    ('clf', SGDClassifier(loss='log', penalty='elasticnet', n_iter=50)),
 ])
 
 # uncommenting more parameters will give better exploring power but will
 # increase processing time in a combinatorial way
 parameters = {
-    'vect__max_df': (0.5, 0.75, 1.0),
+    'vect__max_df': (0.10, 0.20, 0.30, 0.40),
+    #'vect__lowercase': (True, False),
+    #'vect__stop_words': ('english', None),
     #'vect__max_features': (None, 5000, 10000, 50000),
-    'vect__ngram_range': ((1, 1), (1, 2)),  # unigrams or bigrams
+    #'vect__ngram_range': ((1, 1), (1, 2)),  # unigrams or bigrams
     #'tfidf__use_idf': (True, False),
     #'tfidf__norm': ('l1', 'l2'),
-    'clf__alpha': (0.00001, 0.000001),
-    'clf__penalty': ('l2', 'elasticnet'),
+    'clf__alpha': (1e-4, 5e-5, 1e-5),
+    'clf__l1_ratio': (0.1, 0.2, 0.3, 0.4),
+    #'clf__loss': ('hinge', 'log', 'modified_huber')
     #'clf__n_iter': (10, 50, 80),
 }
 
