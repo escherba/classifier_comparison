@@ -13,10 +13,8 @@ from optparse import OptionParser
 import sys
 from time import time
 
-import pickle
+import csv
 import json
-import os
-from omnihack import enumerator
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer
@@ -24,6 +22,7 @@ from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.linear_model import RidgeClassifier
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import Perceptron
 from sklearn.linear_model import PassiveAggressiveClassifier
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB
@@ -31,7 +30,8 @@ from sklearn.naive_bayes import BernoulliNB, MultinomialNB
 from sklearn.neighbors import NearestCentroid
 from sklearn.utils.extmath import density
 from sklearn import metrics
-from sklearn.datasets.base import Bunch
+
+from lfcorpus_utils import get_data_frames
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
@@ -44,25 +44,18 @@ op.add_option("--report",
               action="store_true", dest="print_report",
               help="Print a detailed classification report.")
 op.add_option("--chi2_select",
-              action="store", type="int", dest="select_chi2",
+              action="store", type=int, dest="select_chi2",
               help="Select some number of features using a chi-squared test")
 op.add_option("--confusion_matrix",
               action="store_true", dest="print_cm",
               help="Print the confusion matrix.")
-op.add_option("--top10",
-              action="store_true", dest="print_top10",
-              help="Print ten most discriminative terms per class"
-                   " for every classifier.")
-op.add_option("--use_hashing",
-              action="store_true",
+op.add_option("--top_terms", type=int, dest="top_terms",
+              help="Print most discriminative terms per class.")
+op.add_option("--use_hashing", action="store_true",
               help="Use a hashing vectorizer.")
 op.add_option("--n_features",
               action="store", type=int, default=2 ** 16,
               help="n_features when using the hashing vectorizer.")
-op.add_option("--filtered",
-              action="store_true",
-              help="Remove newsgroup information that is easily overfit: "
-                   "headers, signatures, and quoting.")
 op.add_option("--data_dir", type=str,
               help="data directory")
 op.add_option("--output", type=str,
@@ -79,68 +72,6 @@ if len(args) > 0:
     op.error("this script takes no arguments.")
     sys.exit(1)
 
-
-def get_files(dirname, extension=".txt"):
-    for root, dirs, files in os.walk(dirname):
-        for fname in files:
-            if fname.endswith(extension):
-                yield os.path.join(root, fname)
-
-
-def get_category(fname):
-    return os.path.basename(os.path.splitext(fname)[0])
-
-
-def split_list(l, ratio):
-    pivot = int(len(l) * ratio)
-    list_1st_half = l[0:pivot]
-    list_2nd_half = l[pivot:]
-    return list_1st_half, list_2nd_half
-
-
-def get_data_frames(dirname, get_data, train_test_ratio=0.75):
-    category_codes = enumerator()
-    x_training = []
-    x_testing = []
-    y_training = []
-    y_testing = []
-    fnames = get_files(dirname)
-    for fname in fnames:
-        file_data = []
-        with open(fname) as f:
-            for line in f:
-                file_data.append(get_data(line))
-        category_code = category_codes[get_category(fname)]
-        categories = [category_code] * len(file_data)
-        data_train, data_test = split_list(file_data, train_test_ratio)
-        cat_train, cat_test = split_list(categories, train_test_ratio)
-        x_training.extend(data_train)
-        x_testing.extend(data_test)
-        y_training.extend(cat_train)
-        y_testing.extend(cat_test)
-
-    return (
-        Bunch(
-            DESCR="training set (3/4)",
-            data=x_training,
-            target=np.array(y_training),
-            target_names=category_codes.keys(),
-            filenames=fnames
-        ),
-        Bunch(
-            DESCR="testing set (1/4)",
-            data=x_testing,
-            target=np.array(y_testing),
-            target_names=category_codes.keys(),
-            filenames=fnames
-        )
-    )
-
-
-if opts.filtered:
-    remove = ('headers', 'footers', 'quotes')
-else:
-    remove = ()
 
 data_train, data_test = get_data_frames(
     opts.data_dir,
@@ -220,12 +151,11 @@ def benchmark(clf, clf_descr=None):
         print("dimensionality: %d" % clf.coef_.shape[1])
         print("density: %f" % density(clf.coef_))
 
-        if opts.print_top10 and feature_names is not None:
-            print("top 10 keywords per class:")
-            for i, category in enumerate(categories):
-                top10 = np.argsort(clf.coef_[i])[-10:]
-                print(trim("%s: %s"
-                      % (category, " ".join(feature_names[top10]))))
+        if opts.top_terms is not None and feature_names is not None:
+            print("top %d keywords per class:" % opts.top_terms)
+            for i, category in enumerate(categories[1:]):
+                top_terms = np.argsort(clf.coef_[i])[-opts.top_terms:]
+                print("%s\n %s" % (category, ' '.join(feature_names[top_terms])))
         print()
 
     if opts.print_report:
@@ -242,7 +172,7 @@ def benchmark(clf, clf_descr=None):
     return clf_descr, score, train_time, test_time
 
 
-results = []
+results = [["Classifier", "Score", "Train.Time", "Test.Time"]]
 for clf, name in (
         (RidgeClassifier(tol=1e-2, solver="lsqr"), "Ridge Classifier"),
         (Perceptron(n_iter=50), "Perceptron"),
@@ -261,17 +191,19 @@ for penalty in ["l2", "l1"]:
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
         "LinearSVC (" + penalty.upper() + " penalty)"))
 
+
 class L1LinearSVC(LinearSVC):
 
     def fit(self, X, y):
         # The smaller C, the stronger the regularization.
         # The more regularization, the more sparsity.
-        self.transformer_ = LinearSVC(C=0.5,
+        self.transformer_ = LinearSVC(C=0.2,
                                       penalty="l1",
                                       dual=False,
                                       tol=1e-3)
+        print("before feture selection: " + str(X.shape))
         X = self.transformer_.fit_transform(X, y)
-        print(X.shape)
+        print("after feature selection: " + str(X.shape))
         return LinearSVC.fit(self, X, y)
 
     def predict(self, X):
@@ -287,15 +219,48 @@ results.append(benchmark(L1LinearSVC(),
 for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("%s penalty" % penalty.upper())
+    # Train Liblinear model
     results.append(benchmark(
-        SGDClassifier(alpha=.0001, n_iter=50, penalty=penalty),
+        LogisticRegression(penalty=penalty, dual=False, tol=1e-3),
+        "LogisticRegression (" + penalty.upper() + " penalty)"))
+
+
+class L1Logistic(LogisticRegression):
+
+    def fit(self, X, y):
+        # The smaller C, the stronger the regularization.
+        # The more regularization, the more sparsity.
+        self.transformer_ = LogisticRegression(C=0.2,
+                                               penalty="l1",
+                                               dual=False,
+                                               tol=1e-3)
+        print("before feture selection: " + str(X.shape))
+        X = self.transformer_.fit_transform(X, y)
+        print("after feature selection: " + str(X.shape))
+        return LogisticRegression.fit(self, X, y)
+
+    def predict(self, X):
+        X = self.transformer_.transform(X)
+        return LogisticRegression.predict(self, X)
+
+
+print('=' * 80)
+print("LogisticRegression with L1-based feature selection")
+results.append(benchmark(L1LinearSVC(),
+               "LogisticRegression (L1 feature select)"))
+
+for penalty in ["l2", "l1"]:
+    print('=' * 80)
+    print("%s penalty" % penalty.upper())
+    results.append(benchmark(
+        SGDClassifier(loss='hinge', alpha=.0001, n_iter=50, penalty=penalty),
         "SGD (" + penalty.upper() + " penalty)"))
 
 # Train SGD with Elastic Net penalty
 print('=' * 80)
 print("Elastic-Net penalty")
 results.append(benchmark(
-    SGDClassifier(alpha=.0001, n_iter=50, penalty="elasticnet"),
+    SGDClassifier(loss='hinge', alpha=.0001, n_iter=50, penalty="elasticnet"),
     "SGD w/ elastic-net penalty"))
 
 # Train NearestCentroid without threshold
@@ -310,6 +275,7 @@ results.append(benchmark(MultinomialNB(alpha=.01)))
 results.append(benchmark(BernoulliNB(alpha=.01)))
 
 
-
-with open(opts.output, 'w') as f:
-    pickle.dump(results, f)
+with open(opts.output, 'wb') as csvfile:
+    writer = csv.writer(csvfile, delimiter=",",
+                        quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
+    writer.writerows(results)
