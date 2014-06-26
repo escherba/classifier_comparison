@@ -1,6 +1,6 @@
 .PHONY: plot clean extract_topics
 
-CORPUS_DIR=/Users/escherba/dev/py-nlp/var/corpora/livefyre
+CORPUS_DIR=~/dev/py-nlp/var/corpora/livefyre
 
 plot: plot.py fit_metrics.csv
 	python $^
