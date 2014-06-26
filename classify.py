@@ -91,7 +91,7 @@ if opts.use_hashing:
                                    n_features=opts.n_features)
     X_train = vectorizer.transform(data_train.data)
 else:
-    vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.5,
+    vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                                  stop_words='english')
     X_train = vectorizer.fit_transform(data_train.data)
 duration = time() - t0
