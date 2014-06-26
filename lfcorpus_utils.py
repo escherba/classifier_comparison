@@ -15,7 +15,7 @@ def get_category(fname):
     return os.path.basename(os.path.splitext(fname)[0])
 
 
-def get_data_frame(dirname, get_data):
+def get_data_frame(dirname, get_data, cat_filter=None):
     category_codes = enumerator()
     x_nested = []
     y_nested = []
@@ -23,6 +23,9 @@ def get_data_frame(dirname, get_data):
     num_files = len(fnames)
     max_num_lines = 0
     for fname in fnames:
+        cat_name = get_category(fname)
+        if (cat_filter is not None) and (cat_name not in cat_filter):
+            continue
         file_data = []
         num_lines = 0
         with open(fname) as f:
@@ -33,7 +36,7 @@ def get_data_frame(dirname, get_data):
         if num_lines > max_num_lines:
             max_num_lines = num_lines
 
-        category_code = category_codes[get_category(fname)]
+        category_code = category_codes[cat_name]
         categories = [category_code] * len(file_data)
         x_nested.append(file_data)
         y_nested.append(categories)
@@ -65,7 +68,7 @@ def split_list(l, ratio):
     return list_1st_half, list_2nd_half
 
 
-def get_data_frames(dirname, get_data, train_test_ratio=0.75):
+def get_data_frames(dirname, get_data, train_test_ratio=0.75, cat_filter=None):
     category_codes = enumerator()
     x_training = []
     x_testing = []
@@ -73,12 +76,14 @@ def get_data_frames(dirname, get_data, train_test_ratio=0.75):
     y_testing = []
     fnames = get_files(dirname)
     for fname in fnames:
-        print("Using file " + fname)
+        cat_name = get_category(fname)
+        if (cat_filter is not None) and (cat_name not in cat_filter):
+            continue
         file_data = []
         with open(fname) as f:
             for line in f:
                 file_data.append(get_data(line))
-        category_code = category_codes[get_category(fname)]
+                category_code = category_codes[cat_name]
         categories = [category_code] * len(file_data)
         data_train, data_test = split_list(file_data, train_test_ratio)
         cat_train, cat_test = split_list(categories, train_test_ratio)
