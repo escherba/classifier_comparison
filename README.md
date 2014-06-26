@@ -10,3 +10,7 @@ To draw some plots:
 To perform grid search with SGD classifier:
 
     make grid_search
+
+To perform topic extraction:
+
+    make extract_topics
