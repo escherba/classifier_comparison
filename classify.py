@@ -267,8 +267,8 @@ results.append(benchmark(NearestCentroid()))
 # Train sparse Naive Bayes classifiers
 print('=' * 80)
 print("Naive Bayes")
-results.append(benchmark(MultinomialNB(alpha=.01)))
-results.append(benchmark(BernoulliNB(alpha=.01)))
+results.append(benchmark(MultinomialNB(alpha=1.5)))
+results.append(benchmark(BernoulliNB(alpha=0.2, binarize=None)))
 
 
 with open(opts.output, 'wb') as csvfile:
