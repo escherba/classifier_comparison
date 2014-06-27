@@ -155,7 +155,7 @@ def benchmark(clf, clf_descr=None):
             print("top %d keywords per class:" % opts.top_terms)
             for i, category in enumerate(categories[1:]):
                 top_terms = np.argsort(clf.coef_[i])[-opts.top_terms:]
-                print("%s\n %s" % (category, ' '.join(feature_names[top_terms])))
+                print("%s\n %s" % (category, ' '.join(feature_names[top_terms]).encode('utf-8')))
         print()
 
     if opts.print_report:
