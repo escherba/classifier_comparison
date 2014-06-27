@@ -192,28 +192,32 @@ for penalty in ["l2", "l1"]:
         "LinearSVC (" + penalty.upper() + " penalty)"))
 
 
-class L1LinearSVC(LinearSVC):
+def with_l1_feature_selection(class_T, **kwargs):
+    class Derived(class_T):
 
-    def fit(self, X, y):
-        # The smaller C, the stronger the regularization.
-        # The more regularization, the more sparsity.
-        self.transformer_ = LinearSVC(C=0.2,
-                                      penalty="l1",
-                                      dual=False,
-                                      tol=1e-3)
-        print("before feture selection: " + str(X.shape))
-        X = self.transformer_.fit_transform(X, y)
-        print("after feature selection: " + str(X.shape))
-        return LinearSVC.fit(self, X, y)
+        def fit(self, X, y):
+            # The smaller C, the stronger the regularization.
+            # The more regularization, the more sparsity.
+            self.transformer_ = class_T(penalty="l1", **kwargs)
+            print("before feture selection: " + str(X.shape))
+            X = self.transformer_.fit_transform(X, y)
+            print("after feature selection: " + str(X.shape))
+            return class_T.fit(self, X, y)
 
-    def predict(self, X):
-        X = self.transformer_.transform(X)
-        return LinearSVC.predict(self, X)
+        def predict(self, X):
+            X = self.transformer_.transform(X)
+            return class_T.predict(self, X)
+
+    Derived.__name__ += '_' + class_T.__name__
+    return Derived
 
 print('=' * 80)
 print("LinearSVC with L1-based feature selection")
-results.append(benchmark(L1LinearSVC(),
-               "LinearSVC (L1 feature select)"))
+results.append(benchmark(
+    with_l1_feature_selection(
+        LinearSVC, C=0.1, dual=False, tol=1e-3
+    )(),
+    "LinearSVC (L1 feature select)"))
 
 
 for penalty in ["l2", "l1"]:
@@ -225,29 +229,13 @@ for penalty in ["l2", "l1"]:
         "LogisticRegression (" + penalty.upper() + " penalty)"))
 
 
-class L1Logistic(LogisticRegression):
-
-    def fit(self, X, y):
-        # The smaller C, the stronger the regularization.
-        # The more regularization, the more sparsity.
-        self.transformer_ = LogisticRegression(C=0.2,
-                                               penalty="l1",
-                                               dual=False,
-                                               tol=1e-3)
-        print("before feture selection: " + str(X.shape))
-        X = self.transformer_.fit_transform(X, y)
-        print("after feature selection: " + str(X.shape))
-        return LogisticRegression.fit(self, X, y)
-
-    def predict(self, X):
-        X = self.transformer_.transform(X)
-        return LogisticRegression.predict(self, X)
-
-
 print('=' * 80)
 print("LogisticRegression with L1-based feature selection")
-results.append(benchmark(L1LinearSVC(),
-               "LogisticRegression (L1 feature select)"))
+results.append(benchmark(
+    with_l1_feature_selection(
+        LogisticRegression, C=0.1, dual=False, tol=1e-3
+    )(),
+    "LogisticRegression (L1-feature select)"))
 
 for penalty in ["l2", "l1"]:
     print('=' * 80)
@@ -256,12 +244,14 @@ for penalty in ["l2", "l1"]:
         SGDClassifier(loss='hinge', alpha=.0001, n_iter=50, penalty=penalty),
         "SGD (" + penalty.upper() + " penalty)"))
 
-# Train SGD with Elastic Net penalty
+# Train SGD with L1-feature selection
 print('=' * 80)
-print("Elastic-Net penalty")
+print("SGD L1 feature slection")
 results.append(benchmark(
-    SGDClassifier(loss='hinge', alpha=.0001, n_iter=50, penalty="elasticnet"),
-    "SGD w/ elastic-net penalty"))
+    with_l1_feature_selection(
+        SGDClassifier, loss='log', alpha=0.001, n_iter=10
+    )(loss='hinge', alpha=.0001, n_iter=50),
+    "SGD (L1-feature select)"))
 
 # Train NearestCentroid without threshold
 print('=' * 80)
