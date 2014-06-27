@@ -155,7 +155,11 @@ def benchmark(clf, clf_descr=None):
             print("top %d keywords per class:" % opts.top_terms)
             for i, category in enumerate(categories[1:]):
                 top_terms = np.argsort(clf.coef_[i])[-opts.top_terms:]
-                print("%s\n %s" % (category, ' '.join(feature_names[top_terms]).encode('utf-8')))
+                if clf.__class__.__name__.startswith("FeatureSelect"):
+                    tfnames = clf.transformer_.transform(feature_names)[0]
+                else:
+                    tfnames = feature_names
+                print("%s\n %s" % (category, ' '.join(tfnames[top_terms]).encode('utf-8')))
         print()
 
     if opts.print_report:
@@ -185,7 +189,7 @@ for clf, name in (
 
 for penalty in ["l2", "l1"]:
     print('=' * 80)
-    print("%s penalty" % penalty.upper())
+    print("LinearSVC with %s penalty" % penalty.upper())
     # Train Liblinear model
     results.append(benchmark(
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
@@ -193,7 +197,7 @@ for penalty in ["l2", "l1"]:
 
 
 def with_l1_feature_selection(class_T, **kwargs):
-    class Derived(class_T):
+    class FeatureSelect(class_T):
 
         def fit(self, X, y):
             # The smaller C, the stronger the regularization.
@@ -208,8 +212,8 @@ def with_l1_feature_selection(class_T, **kwargs):
             X = self.transformer_.transform(X)
             return class_T.predict(self, X)
 
-    Derived.__name__ += '_' + class_T.__name__
-    return Derived
+    FeatureSelect.__name__ += '_' + class_T.__name__
+    return FeatureSelect
 
 print('=' * 80)
 print("LinearSVC with L1-based feature selection")
