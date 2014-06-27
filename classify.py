@@ -222,7 +222,7 @@ results.append(benchmark(
 
 for penalty in ["l2", "l1"]:
     print('=' * 80)
-    print("%s penalty" % penalty.upper())
+    print("Logistic Regression with %s penalty" % penalty.upper())
     # Train Liblinear model
     results.append(benchmark(
         LogisticRegression(penalty=penalty, dual=False, tol=1e-3),
@@ -239,10 +239,16 @@ results.append(benchmark(
 
 for penalty in ["l2", "l1"]:
     print('=' * 80)
-    print("%s penalty" % penalty.upper())
+    print("SGD with %s penalty" % penalty.upper())
     results.append(benchmark(
         SGDClassifier(loss='hinge', alpha=.0001, n_iter=50, penalty=penalty),
         "SGD (" + penalty.upper() + " penalty)"))
+
+print('=' * 80)
+print("SGD with elasticnet penalty")
+results.append(benchmark(
+    SGDClassifier(loss='hinge', alpha=3e-5, n_iter=50, penalty='elasticnet', l1_ratio=0.3),
+    "SGD (elasticnet penalty)"))
 
 # Train SGD with L1-feature selection
 print('=' * 80)

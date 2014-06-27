@@ -73,7 +73,7 @@ pipeline = Pipeline([
 param_grid = [
     {'clf__loss': ['hinge'],
      'clf__alpha': [1e-3, 3e-4, 1e-4, 3e-5, 1e-5],
-     'clf__l1_ratio': [0.00, 0.10, 0.20, 0.30]},
+     'clf__l1_ratio': [0.20, 0.25, 0.30, 0.35, 0.40]},
 
     {'clf__loss': ['log'],
      'clf__alpha': [1e-3, 3e-4, 1e-4, 3e-5, 1e-5],

@@ -21,6 +21,7 @@ fit_metrics.csv: classify.py
 
 grid_search: grid_search.py
 	python $< \
+		--scoring f1 \
 		--data_dir $(CORPUS_DIR)
 
 clean:
