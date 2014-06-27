@@ -178,9 +178,9 @@ def benchmark(clf, clf_descr=None):
 
 results = [["Classifier", "Score", "Train.Time", "Test.Time"]]
 for clf, name in (
-        (RidgeClassifier(tol=1e-2, solver="lsqr"), "Ridge Classifier"),
-        (Perceptron(n_iter=50), "Perceptron"),
-        (PassiveAggressiveClassifier(n_iter=50), "Passive-Aggressive")):
+        (RidgeClassifier(alpha=8.0, solver="sparse_cg"), "Ridge Classifier"),
+        (Perceptron(n_iter=50, alpha=1.0), "Perceptron"),
+        (PassiveAggressiveClassifier(n_iter=10, C=0.1), "Passive-Aggressive")):
 
     # (KNeighborsClassifier(n_neighbors=10), "kNN")
     print('=' * 80)
