@@ -233,7 +233,7 @@ print('=' * 80)
 print("LogisticRegression with L1-based feature selection")
 results.append(benchmark(
     with_l1_feature_selection(
-        LogisticRegression, C=0.1, dual=False, tol=1e-3
+        LogisticRegression, C=0.42, dual=False, tol=1e-3
     )(),
     "LogisticRegression (L1-feature select)"))
 
@@ -249,8 +249,8 @@ print('=' * 80)
 print("SGD L1 feature slection")
 results.append(benchmark(
     with_l1_feature_selection(
-        SGDClassifier, loss='log', alpha=0.001, n_iter=10
-    )(loss='hinge', alpha=.0001, n_iter=50),
+        SGDClassifier, loss='log', alpha=0.00021, n_iter=10
+    )(loss='log', alpha=.0001, n_iter=50),
     "SGD (L1-feature select)"))
 
 # Train NearestCentroid without threshold
