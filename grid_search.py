@@ -56,7 +56,7 @@ pipeline = Pipeline([
     ('vect', CountVectorizer(lowercase=True, stop_words="english", max_df=0.30)),
     ('tfidf', TfidfTransformer(sublinear_tf=True)),
     ('norm', Normalizer()),
-    ('clf', SGDClassifier(loss='hinge', penalty='elasticnet', n_iter=50)),
+    ('clf', SGDClassifier(penalty='elasticnet', n_iter=50)),
 ])
 
 # uncommenting more parameters will give better exploring power but will
@@ -71,7 +71,7 @@ parameters = {
     #'tfidf__use_idf': (True, False),
     #'tfidf__norm': ('l1', 'l2'),
     'clf__alpha': (1e-2, 1e-3, 1e-4, 1e-5, 1e-6),
-    'clf__l1_ratio': (0.0, 0.1, 0.2),
+    'clf__l1_ratio': (0.0, 0.1, 0.2, 0.3, 0.4, 0.5),
     'clf__loss': ('hinge', 'log', 'modified_huber')
     #'clf__n_iter': (10, 50, 80),
 }
@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     # find the best parameters for both the feature extraction and the
     # classifier
-    grid_search = GridSearchCV(pipeline, parameters, n_jobs=-1, verbose=1)
+    grid_search = GridSearchCV(pipeline, parameters, n_jobs=-1, verbose=1, scoring='roc_auc')
 
     print("Performing grid search...")
     print("pipeline:", [name for name, _ in pipeline.steps])
