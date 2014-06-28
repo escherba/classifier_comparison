@@ -16,12 +16,12 @@ from time import time
 import csv
 import json
 
-from sklearn import svm
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.linear_model import RidgeClassifier
 from sklearn.svm import LinearSVC
+# from sklearn import svm
 from sklearn.linear_model import SGDClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import Perceptron
@@ -124,7 +124,6 @@ if opts.select_chi2:
     print()
 
 
-
 ###############################################################################
 # Benchmark classifiers
 def benchmark(clf, clf_descr=None):
@@ -156,13 +155,15 @@ def benchmark(clf, clf_descr=None):
                     tfnames = clf.transformer_.transform(feature_names)[0]
                 else:
                     tfnames = feature_names
-                print("%s\n %s" % (category, ' '.join(tfnames[top_terms]).encode('utf-8')))
+                print("%s\n %s" % (category, ' '.
+                                   join(tfnames[top_terms]).encode('utf-8')))
         print()
 
     if opts.print_report:
         print("classification report:")
+        categories = data_train.target_names
         print(metrics.classification_report(y_test, pred,
-                                            target_names=data_train.target_names))
+                                            target_names=categories))
 
     if opts.print_cm:
         print("confusion matrix:")
@@ -245,12 +246,12 @@ for penalty in ["l2", "l1"]:
         SGDClassifier(loss='hinge', alpha=.0001, n_iter=50, penalty=penalty),
         "SGD (" + penalty.upper() + " penalty)"))
 
-print('=' * 80)
-print("SGD with elasticnet penalty")
-results.append(benchmark(
-    SGDClassifier(loss='hinge', alpha=3e-5, n_iter=50, penalty='elasticnet',
-                  l1_ratio=0.3),
-    "SGD (elasticnet penalty)"))
+# print('=' * 80)
+# print("SGD with elasticnet penalty")
+# results.append(benchmark(
+#     SGDClassifier(loss='hinge', alpha=3e-5, n_iter=50, penalty='elasticnet',
+#                   l1_ratio=0.3),
+#     "SGD (elasticnet penalty)"))
 
 # Train SGD with L1-feature selection
 print('=' * 80)
@@ -264,7 +265,7 @@ results.append(benchmark(
 # Train NearestCentroid without threshold
 print('=' * 80)
 print("NearestCentroid (aka Rocchio classifier)")
-results.append(benchmark(NearestCentroid()))
+results.append(benchmark(NearestCentroid(metric='cosine')))
 
 # Train sparse Naive Bayes classifiers
 print('=' * 80)
@@ -273,11 +274,10 @@ results.append(benchmark(MultinomialNB(alpha=1.5)))
 results.append(benchmark(BernoulliNB(alpha=0.2, binarize=None)))
 
 
-# # Train radial kernal svc 
+# # Train radial kernal svc
 # print('=' * 80)
 # print("Radial kernal svc")
-# results.append(benchmark(svm.SVC(kernel='rbf')))
-
+# results.append(benchmark(SVC(kernel='rbf')))
 
 
 with open(opts.output, 'wb') as csvfile:
