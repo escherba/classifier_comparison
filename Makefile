@@ -1,9 +1,12 @@
-.PHONY: plot clean extract_topics
+.PHONY: pca plot clean extract_topics
 
 CORPUS_DIR=~/dev/py-nlp/var/corpora/livefyre
 
 plot: index.html index.js fit_metrics.csv
 	open -a "Safari" $<
+
+pca: pca.py
+	python $< --data_dir $(CORPUS_DIR)
 
 extract_topics: topic_extraction_with_nmf.py
 	python $< \
@@ -21,6 +24,7 @@ fit_metrics.csv: classify.py
 
 grid_search: grid_search.py
 	python $< \
+		--scoring f1 \
 		--data_dir $(CORPUS_DIR)
 
 clean:

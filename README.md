@@ -7,6 +7,14 @@ To draw some plots:
 
     make plot
 
+To display corpus using PCA:
+
+	make pca
+	
+This will plot an image like this:
+
+![image](images/figure_1.PCA.png)
+
 To perform grid search with SGD classifier:
 
     make grid_search
