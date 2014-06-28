@@ -39,7 +39,8 @@ if opts.data_dir is None:
 
 data_train, data_test = get_data_frames(
     opts.data_dir,
-    lambda line: json.loads(line)['content'])
+    lambda line: json.loads(line)['content'],
+    train_test_ratio=1.00)
 
 
 # split a training set and a test set
@@ -59,13 +60,6 @@ else:
     duration = time() - t0
     print("n_samples: %d, n_features: %d" % X_train.shape)
     print()
-
-print("Extracting features from the test dataset using the same vectorizer")
-t0 = time()
-X_test = vectorizer.transform(data_test.data)
-duration = time() - t0
-print("n_samples: %d, n_features: %d" % X_test.shape)
-print()
 
 
 # mapping from integer feature name to original token string
