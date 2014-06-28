@@ -16,6 +16,7 @@ from time import time
 import csv
 import json
 
+from sklearn import svm
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer
 from sklearn.feature_selection import SelectKBest, chi2
@@ -263,6 +264,13 @@ print('=' * 80)
 print("Naive Bayes")
 results.append(benchmark(MultinomialNB(alpha=.01)))
 results.append(benchmark(BernoulliNB(alpha=.01)))
+
+
+# # Train radial kernal svc 
+# print('=' * 80)
+# print("Radial kernal svc")
+# results.append(benchmark(svm.SVC(kernel='rbf')))
+
 
 
 with open(opts.output, 'wb') as csvfile:
