@@ -1,0 +1,75 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 10px sans-serif;
+  background-color: #F8F8F8;
+}
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.x.axis path {
+  display: none;
+}
+
+.d3-tip {
+  line-height: 1;
+  font-weight: bold;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 2px;
+}
+
+/* Creates a small triangle extender for the tooltip */
+.d3-tip:after {
+  box-sizing: border-box;
+  display: inline;
+  font-size: 10px;
+  width: 100%;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.8);
+  content: "\25BC";
+  position: absolute;
+  text-align: center;
+}
+
+/* Style northward tooltips differently */
+.d3-tip.n:after {
+  margin: -1px 0 0 0;
+  top: 100%;
+  left: 0;
+
+</style>
+<body>
+  <script src="http://d3js.org/d3.v3.min.js"></script>
+  <script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
+  <h1> Screwdriver with no head </h1><br>
+<button type="button" onclick="makeplot()">Update plots</button>
+<button type="button" onclick="checkall(); makeplot()">Check All</button>
+<button type="button" onclick="uncheckall(); makeplot()">Uncheck ALL</button>
+  <h2> Classifiers </h2>
+<div id="classifiers">
+
+</div>
+
+  <h2> Metrics </h2>
+<div>
+<input class="classifier_ctrl" type="checkbox" name="value" value="stat" id="Score" checked>Score
+<input class="classifier_ctrl" type="checkbox" name="value" value="stat" id="Train.Time" checked>Train.Time
+<input class="classifier_ctrl" type="checkbox" name="value" value="stat" id="Test.Time" checked>Test.Time
+</div>
+
+
+
+
+
+<script src="index.js"></script>
+ 
