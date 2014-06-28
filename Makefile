@@ -1,9 +1,12 @@
-.PHONY: plot clean extract_topics
+.PHONY: pca plot clean extract_topics
 
 CORPUS_DIR=~/dev/py-nlp/var/corpora/livefyre
 
 plot: plot.py fit_metrics.csv
 	python $^
+
+pca: pca.py
+	python $< --data_dir $(CORPUS_DIR)
 
 extract_topics: topic_extraction_with_nmf.py
 	python $< \

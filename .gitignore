@@ -53,5 +53,9 @@ coverage.xml
 docs/_build/
 
 
-fit_metrics.pickle
+# Vim
+*.sw[op]
+
+# Emacs
+\#*#
 
