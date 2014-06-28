@@ -8,13 +8,13 @@
 from __future__ import print_function
 
 import logging
-import numpy as np
-from optparse import OptionParser
-import sys
-from time import time
-
 import csv
 import json
+
+from time import time
+from argparse import ArgumentParser
+
+import numpy as np
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer
@@ -40,38 +40,35 @@ logging.basicConfig(level=logging.INFO,
 
 
 # parse commandline arguments
-op = OptionParser()
-op.add_option("--report",
-              action="store_true", dest="print_report",
-              help="Print a detailed classification report.")
-op.add_option("--chi2_select",
-              action="store", type=int, dest="select_chi2",
-              help="Select some number of features using a chi-squared test")
-op.add_option("--confusion_matrix",
-              action="store_true", dest="print_cm",
-              help="Print the confusion matrix.")
-op.add_option("--top_terms", type=int, dest="top_terms",
-              help="Print most discriminative terms per class.")
-op.add_option("--use_hashing", action="store_true",
-              help="Use a hashing vectorizer.")
-op.add_option("--n_features",
-              action="store", type=int, default=2 ** 16,
-              help="n_features when using the hashing vectorizer.")
-op.add_option("--data_dir", type=str,
-              help="data directory")
-op.add_option("--output", type=str,
-              help="output path")
+op = ArgumentParser()
+op.add_argument("--report",
+                action="store_true", dest="print_report",
+                help="Print a detailed classification report.")
+op.add_argument("--chi2_select",
+                action="store", type=int, dest="select_chi2",
+                help="Select some number of features using a chi-squared test")
+op.add_argument("--confusion_matrix",
+                action="store_true", dest="print_cm",
+                help="Print the confusion matrix.")
+op.add_argument("--top_terms", type=int, dest="top_terms",
+                help="Print most discriminative terms per class.")
+op.add_argument("--use_hashing", action="store_true",
+                help="Use a hashing vectorizer.")
+op.add_argument("--n_features",
+                action="store", type=int, default=2 ** 16,
+                help="n_features when using the hashing vectorizer.")
+op.add_argument("--data_dir", type=str,
+                help="data directory")
+op.add_argument("--output", type=str,
+                help="output path")
 
 
-(opts, args) = op.parse_args()
+opts = op.parse_args()
 if opts.data_dir is None:
     op.error('Data directory not given')
+
 if opts.output is None:
     op.error('Output path not given')
-
-if len(args) > 0:
-    op.error("this script takes no arguments.")
-    sys.exit(1)
 
 
 data_train, data_test = get_data_frames(
@@ -93,6 +90,7 @@ else:
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                                  stop_words='english')
     X_train = vectorizer.fit_transform(data_train.data)
+
 duration = time() - t0
 print("n_samples: %d, n_features: %d" % X_train.shape)
 print()
@@ -157,6 +155,7 @@ def benchmark(clf, clf_descr=None):
                     tfnames = feature_names
                 print("%s\n %s" % (category, ' '.
                                    join(tfnames[top_terms]).encode('utf-8')))
+
         print()
 
     if opts.print_report:
@@ -171,6 +170,7 @@ def benchmark(clf, clf_descr=None):
 
     if clf_descr is None:
         clf_descr = str(clf).split('(')[0]
+
     return clf_descr, score, train_time, test_time
 
 

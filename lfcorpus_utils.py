@@ -2,6 +2,7 @@ import os
 import numpy as np
 from omnihack import enumerator
 from sklearn.datasets.base import Bunch
+from sklearn.cross_validation import train_test_split
 
 
 def get_files(dirname, extension=".source"):
@@ -61,14 +62,7 @@ def get_data_frame(dirname, get_data, cat_filter=None):
     )
 
 
-def split_list(l, ratio):
-    pivot = int(len(l) * ratio)
-    list_1st_half = l[0:pivot]
-    list_2nd_half = l[pivot:]
-    return list_1st_half, list_2nd_half
-
-
-def get_data_frames(dirname, get_data, train_test_ratio=0.75, cat_filter=None):
+def get_data_frames(dirname, get_data, test_size=0.25, cat_filter=None):
     category_codes = enumerator()
     x_training = []
     x_testing = []
@@ -85,8 +79,10 @@ def get_data_frames(dirname, get_data, train_test_ratio=0.75, cat_filter=None):
                 file_data.append(get_data(line))
                 category_code = category_codes[cat_name]
         categories = [category_code] * len(file_data)
-        data_train, data_test = split_list(file_data, train_test_ratio)
-        cat_train, cat_test = split_list(categories, train_test_ratio)
+
+        data_train, data_test, cat_train, cat_test = \
+            train_test_split(file_data, categories, test_size=test_size)
+
         x_training.extend(data_train)
         x_testing.extend(data_test)
         y_training.extend(cat_train)

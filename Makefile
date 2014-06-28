@@ -1,9 +1,12 @@
-.PHONY: pca plot clean extract_topics
+.PHONY: pca plot plot_py clean extract_topics
 
 CORPUS_DIR=~/dev/py-nlp/var/corpora/livefyre
 
 plot: index.html index.js fit_metrics.csv
 	open -a "Safari" $<
+
+plot_py: plot.py fit_metrics.csv
+	python $^
 
 pca: pca.py
 	python $< --data_dir $(CORPUS_DIR)
