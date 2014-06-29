@@ -75,8 +75,6 @@ data_train, data_test = get_data_frames(
     opts.data_dir,
     lambda line: json.loads(line)['content'])
 
-
-# split a training set and a test set
 y_train, y_test = data_train.target, data_test.target
 
 print("Extracting features from the training dataset "
@@ -191,7 +189,6 @@ for clf in (
 for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("LinearSVC with %s penalty" % penalty.upper())
-    # Train Liblinear model
     results.append(benchmark(
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
         "LinearSVC (" + penalty.upper() + " penalty)"))
@@ -228,7 +225,6 @@ results.append(benchmark(
 for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("Logistic Regression with %s penalty" % penalty.upper())
-    # Train Liblinear model
     results.append(benchmark(
         LogisticRegression(penalty=penalty, dual=False, tol=1e-3),
         "LogisticRegression (" + penalty.upper() + " penalty)"))
@@ -256,7 +252,6 @@ for penalty in ["l2", "l1"]:
 #                   l1_ratio=0.3),
 #     "SGD (elasticnet penalty)"))
 
-# Train SGD with L1-feature selection
 print('=' * 80)
 print("SGD L1 feature slection")
 results.append(benchmark(
@@ -266,7 +261,6 @@ results.append(benchmark(
     "SGD (L1-feature select)"))
 
 
-# # Train radial kernal svc
 # print('=' * 80)
 # print("Radial kernal svc")
 # results.append(benchmark(SVC(kernel='rbf')))
