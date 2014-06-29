@@ -27,7 +27,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import Perceptron
 from sklearn.linear_model import PassiveAggressiveClassifier
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB
-# from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neighbors import NearestCentroid
 from sklearn.utils.extmath import density
 from sklearn import metrics
@@ -175,14 +175,17 @@ def benchmark(clf, clf_descr=None):
 
 
 results = [["Classifier", "Score", "Train.Time", "Test.Time"]]
-for clf, name in (
-        (RidgeClassifier(alpha=8.0, solver="sparse_cg"), "Ridge Classifier"),
-        (Perceptron(n_iter=50, alpha=1.0), "Perceptron"),
-        (PassiveAggressiveClassifier(n_iter=10, C=0.1), "Passive-Aggressive")):
-
-    # (KNeighborsClassifier(n_neighbors=10), "kNN")
+for clf in (
+        RidgeClassifier(alpha=8.0, solver="sparse_cg"),
+        Perceptron(n_iter=50, alpha=1.0),
+        PassiveAggressiveClassifier(n_iter=10, C=0.1),
+        NearestCentroid(metric='cosine'),
+        KNeighborsClassifier(metric='cosine', algorithm='brute'),
+        MultinomialNB(alpha=1.5),
+        BernoulliNB(alpha=0.2, binarize=None)
+):
     print('=' * 80)
-    print(name)
+    print("Classifier: " + clf.__class__.__name__)
     results.append(benchmark(clf))
 
 for penalty in ["l2", "l1"]:
@@ -261,17 +264,6 @@ results.append(benchmark(
         SGDClassifier, loss='log', alpha=0.00021, n_iter=10
     )(loss='log', alpha=.0001, n_iter=50),
     "SGD (L1-feature select)"))
-
-# Train NearestCentroid without threshold
-print('=' * 80)
-print("NearestCentroid (aka Rocchio classifier)")
-results.append(benchmark(NearestCentroid(metric='cosine')))
-
-# Train sparse Naive Bayes classifiers
-print('=' * 80)
-print("Naive Bayes")
-results.append(benchmark(MultinomialNB(alpha=1.5)))
-results.append(benchmark(BernoulliNB(alpha=0.2, binarize=None)))
 
 
 # # Train radial kernal svc
