@@ -9,7 +9,7 @@ import json
 
 from time import time
 from sklearn.feature_extraction import text
-from lfcorpus_utils import get_data_frames
+from lfcorpus_utils import get_data_frame
 
 # parse commandline arguments
 op = ArgumentParser()
@@ -50,7 +50,7 @@ if args.categories is not None:
 else:
     cat_filter = None
 
-dataset, data_test = get_data_frames(
+dataset = get_data_frame(
     args.data_dir,
     lambda line: json.loads(line)['content'],
     cat_filter=cat_filter)
