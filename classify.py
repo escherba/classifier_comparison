@@ -176,13 +176,13 @@ def benchmark(clf, clf_descr=None):
 
 results = [["Classifier", "Score", "Train.Time", "Test.Time"]]
 for clf in (
-        RidgeClassifier(alpha=8.0, solver="sparse_cg"),
-        Perceptron(n_iter=50, alpha=1.0),
-        PassiveAggressiveClassifier(n_iter=10, C=0.1),
-        NearestCentroid(metric='cosine'),
-        KNeighborsClassifier(metric='cosine', algorithm='brute'),
-        MultinomialNB(alpha=1.5),
-        BernoulliNB(alpha=0.2, binarize=None)
+    RidgeClassifier(alpha=8.0, solver="sparse_cg"),
+    Perceptron(n_iter=50, alpha=1.0),
+    PassiveAggressiveClassifier(n_iter=10, C=0.1),
+    NearestCentroid(metric='cosine'),
+    KNeighborsClassifier(metric='cosine', algorithm='brute', n_neighbors=6),
+    MultinomialNB(alpha=1.5),
+    BernoulliNB(alpha=0.2, binarize=None)
 ):
     print('=' * 80)
     print("Classifier: " + clf.__class__.__name__)
