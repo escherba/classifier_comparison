@@ -19,32 +19,40 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import Normalizer
 
+from lf_feat_extract import LemmaTokenizer
+
 from lfcorpus_utils import get_data_frame
 
 op = ArgumentParser()
 op.add_argument("--scoring", type=str,
-              help="data directory")
+                help="data directory")
 op.add_argument("--data_dir", type=str,
-              help="data directory")
+                help="data directory")
 
 args = op.parse_args()
-if args.data_dir is None:
-    op.error('Data directory not given')
+
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s')
 
-
-#data = fetch_20newsgroups(subset='train', categories=categories)
-data = get_data_frame(
-    args.data_dir,
-    lambda line: json.loads(line)['content'])
-
-categories = data.target_names
+if args.data_dir is None:
+    # Load 20 newsgroups corpus
+    from sklearn.datasets import fetch_20newsgroups
+    categories = [
+        'alt.atheism',
+        'talk.religion.misc'
+    ]
+    data = fetch_20newsgroups(subset='train', categories=categories)
+else:
+    # Load custom corpus
+    data = get_data_frame(
+        args.data_dir,
+        lambda line: json.loads(line)['content'])
+    categories = data.target_names
 
 print("%d documents" % len(data.filenames))
-print("%d categories" % len(data.target_names))
+print("%d categories" % len(categories))
 print()
 
 ###############################################################################
@@ -71,13 +79,15 @@ pipeline = Pipeline([
 # 'clf__n_iter': (10, 50, 80),
 
 param_grid = [
-    {'clf__loss': ['hinge'],
-     'clf__alpha': [1e-3, 3e-4, 1e-4, 3e-5, 1e-5],
-     'clf__l1_ratio': [0.20, 0.25, 0.30, 0.35, 0.40]},
+    {'vect__tokenizer': [LemmaTokenizer(), None],
+     'vect__max_df': [0.20, 0.30, 0.40],
+     'clf__loss': ['hinge'],
+     'clf__alpha': [1e-3],
+     'clf__l1_ratio': [0.30]},
 
-    {'clf__loss': ['log'],
-     'clf__alpha': [1e-3, 3e-4, 1e-4, 3e-5, 1e-5],
-     'clf__l1_ratio': [0.35, 0.40, 0.45, 0.50]}
+    # {'clf__loss': ['log'],
+    # 'clf__alpha': [ 1e-4, 1e-6 ],
+    # 'clf__l1_ratio': [ 0.40, 0.60 ]}
 ]
 
 if __name__ == "__main__":

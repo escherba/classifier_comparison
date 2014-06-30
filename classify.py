@@ -33,6 +33,7 @@ from sklearn.utils.extmath import density
 from sklearn import metrics
 
 from lfcorpus_utils import get_data_frames
+from lf_feat_extract import with_l1_feature_selection
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
@@ -64,16 +65,37 @@ op.add_argument("--output", type=str,
 
 
 opts = op.parse_args()
-if opts.data_dir is None:
-    op.error('Data directory not given')
 
 if opts.output is None:
     op.error('Output path not given')
 
 
-data_train, data_test = get_data_frames(
-    opts.data_dir,
-    lambda line: json.loads(line)['content'])
+if opts.data_dir is None:
+    # Load 20 newsgroups corpus
+    from sklearn.datasets import fetch_20newsgroups
+    categories = [
+        'alt.atheism',
+        'talk.religion.misc',
+        'comp.graphics',
+        'sci.space',
+    ]
+    fields_to_remove = ('headers', 'footers', 'quotes')
+    print("Loading 20 newsgroups dataset for categories:")
+    print(categories if categories else "all")
+    data_train = fetch_20newsgroups(subset='train', categories=categories,
+                                    shuffle=True, random_state=42,
+                                    remove=fields_to_remove)
+    data_test = fetch_20newsgroups(subset='test', categories=categories,
+                                   shuffle=True, random_state=42,
+                                   remove=fields_to_remove)
+else:
+    # Load custom corpus
+    data_train, data_test = get_data_frames(
+        opts.data_dir,
+        lambda line: json.loads(line)['content'])
+    categories = data_train.target_names
+
+print('data loaded')
 
 y_train, y_test = data_train.target, data_test.target
 
@@ -145,7 +167,7 @@ def benchmark(clf, clf_descr=None):
 
         if opts.top_terms is not None and feature_names is not None:
             print("top %d keywords per class:" % opts.top_terms)
-            for i, category in enumerate(data_train.target_names[1:]):
+            for i, category in enumerate(categories[1:]):
                 top_terms = np.argsort(clf.coef_[i])[-opts.top_terms:]
                 if clf.__class__.__name__.startswith("FeatureSelect"):
                     tfnames = clf.transformer_.transform(feature_names)[0]
@@ -158,7 +180,6 @@ def benchmark(clf, clf_descr=None):
 
     if opts.print_report:
         print("classification report:")
-        categories = data_train.target_names
         print(metrics.classification_report(y_test, pred,
                                             target_names=categories))
 
@@ -193,25 +214,6 @@ for penalty in ["l2", "l1"]:
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
         "LinearSVC (" + penalty.upper() + " penalty)"))
 
-
-def with_l1_feature_selection(class_T, **kwargs):
-    class FeatureSelect(class_T):
-
-        def fit(self, X, y):
-            # The smaller C, the stronger the regularization.
-            # The more regularization, the more sparsity.
-            self.transformer_ = class_T(penalty="l1", **kwargs)
-            print("before feture selection: " + str(X.shape))
-            X = self.transformer_.fit_transform(X, y)
-            print("after feature selection: " + str(X.shape))
-            return class_T.fit(self, X, y)
-
-        def predict(self, X):
-            X = self.transformer_.transform(X)
-            return class_T.predict(self, X)
-
-    FeatureSelect.__name__ += '_' + class_T.__name__
-    return FeatureSelect
 
 print('=' * 80)
 print("LinearSVC with L1-based feature selection")

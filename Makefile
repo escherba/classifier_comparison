@@ -23,13 +23,13 @@ extract_topics: topic_extraction.py
 fit_metrics.csv: classify.py
 	python $< \
 		--top_terms 100 \
-		--data_dir $(CORPUS_DIR) \
 		--output $@
+		#--data_dir $(CORPUS_DIR) \
 
 grid_search: grid_search.py
 	python $< \
-		--scoring f1 \
-		--data_dir $(CORPUS_DIR)
+		--scoring f1
+		#--data_dir $(CORPUS_DIR)
 
 clean:
 	rm -f *.pyc
