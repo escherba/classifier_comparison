@@ -266,8 +266,7 @@ results.append(benchmark(MultinomialNB(alpha=.01)))
 results.append(benchmark(BernoulliNB(alpha=.01)))
 
 
-# # Train radial kernal svc 
-# print('=' * 80)
+# Train radial kernal svc 
 # print("Radial kernal svc")
 # results.append(benchmark(svm.SVC(kernel='rbf')))
 
