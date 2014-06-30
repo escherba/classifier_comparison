@@ -7,7 +7,7 @@ import pylab as pl
 
 from argparse import ArgumentParser
 from time import time
-from lfcorpus_utils import get_data_frames
+from lfcorpus_utils import get_data_frame
 
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -37,14 +37,12 @@ if opts.data_dir is None:
         op.error('Output path not given')
 
 
-data_train, data_test = get_data_frames(
+data_train = get_data_frame(
     opts.data_dir,
-    lambda line: json.loads(line)['content'],
-    train_test_ratio=1.00)
-
+    lambda line: json.loads(line)['content'])
 
 # split a training set and a test set
-y_train, y_test = data_train.target, data_test.target
+y_train = data_train.target
 
 print("Extracting features from the training dataset "
       "using a sparse vectorizer")

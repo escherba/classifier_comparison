@@ -8,13 +8,13 @@
 from __future__ import print_function
 
 import logging
-import numpy as np
-from optparse import OptionParser
-import sys
-from time import time
-
 import csv
 import json
+
+from time import time
+from argparse import ArgumentParser
+
+import numpy as np
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer
@@ -27,12 +27,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import Perceptron
 from sklearn.linear_model import PassiveAggressiveClassifier
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB
-# from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.neighbors import NearestCentroid
 from sklearn.utils.extmath import density
 from sklearn import metrics
 
 from lfcorpus_utils import get_data_frames
+from lf_feat_extract import with_l1_feature_selection
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
@@ -40,46 +41,62 @@ logging.basicConfig(level=logging.INFO,
 
 
 # parse commandline arguments
-op = OptionParser()
-op.add_option("--report",
-              action="store_true", dest="print_report",
-              help="Print a detailed classification report.")
-op.add_option("--chi2_select",
-              action="store", type=int, dest="select_chi2",
-              help="Select some number of features using a chi-squared test")
-op.add_option("--confusion_matrix",
-              action="store_true", dest="print_cm",
-              help="Print the confusion matrix.")
-op.add_option("--top_terms", type=int, dest="top_terms",
-              help="Print most discriminative terms per class.")
-op.add_option("--use_hashing", action="store_true",
-              help="Use a hashing vectorizer.")
-op.add_option("--n_features",
-              action="store", type=int, default=2 ** 16,
-              help="n_features when using the hashing vectorizer.")
-op.add_option("--data_dir", type=str,
-              help="data directory")
-op.add_option("--output", type=str,
-              help="output path")
+op = ArgumentParser()
+op.add_argument("--report",
+                action="store_true", dest="print_report",
+                help="Print a detailed classification report.")
+op.add_argument("--chi2_select",
+                action="store", type=int, dest="select_chi2",
+                help="Select some number of features using a chi-squared test")
+op.add_argument("--confusion_matrix",
+                action="store_true", dest="print_cm",
+                help="Print the confusion matrix.")
+op.add_argument("--top_terms", type=int, dest="top_terms",
+                help="Print most discriminative terms per class.")
+op.add_argument("--use_hashing", action="store_true",
+                help="Use a hashing vectorizer.")
+op.add_argument("--n_features",
+                action="store", type=int, default=2 ** 16,
+                help="n_features when using the hashing vectorizer.")
+op.add_argument("--data_dir", type=str,
+                help="data directory")
+op.add_argument("--output", type=str,
+                help="output path")
 
 
-(opts, args) = op.parse_args()
-if opts.data_dir is None:
-    op.error('Data directory not given')
+opts = op.parse_args()
+
 if opts.output is None:
     op.error('Output path not given')
 
-if len(args) > 0:
-    op.error("this script takes no arguments.")
-    sys.exit(1)
 
+if opts.data_dir is None:
+    # Load 20 newsgroups corpus
+    from sklearn.datasets import fetch_20newsgroups
+    categories = [
+        'alt.atheism',
+        'talk.religion.misc',
+        'comp.graphics',
+        'sci.space',
+    ]
+    fields_to_remove = ('headers', 'footers', 'quotes')
+    print("Loading 20 newsgroups dataset for categories:")
+    print(categories if categories else "all")
+    data_train = fetch_20newsgroups(subset='train', categories=categories,
+                                    shuffle=True, random_state=42,
+                                    remove=fields_to_remove)
+    data_test = fetch_20newsgroups(subset='test', categories=categories,
+                                   shuffle=True, random_state=42,
+                                   remove=fields_to_remove)
+else:
+    # Load custom corpus
+    data_train, data_test = get_data_frames(
+        opts.data_dir,
+        lambda line: json.loads(line)['content'])
+    categories = data_train.target_names
 
-data_train, data_test = get_data_frames(
-    opts.data_dir,
-    lambda line: json.loads(line)['content'])
+print('data loaded')
 
-
-# split a training set and a test set
 y_train, y_test = data_train.target, data_test.target
 
 print("Extracting features from the training dataset "
@@ -93,6 +110,7 @@ else:
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                                  stop_words='english')
     X_train = vectorizer.fit_transform(data_train.data)
+
 duration = time() - t0
 print("n_samples: %d, n_features: %d" % X_train.shape)
 print()
@@ -149,7 +167,7 @@ def benchmark(clf, clf_descr=None):
 
         if opts.top_terms is not None and feature_names is not None:
             print("top %d keywords per class:" % opts.top_terms)
-            for i, category in enumerate(data_train.target_names[1:]):
+            for i, category in enumerate(categories[1:]):
                 top_terms = np.argsort(clf.coef_[i])[-opts.top_terms:]
                 if clf.__class__.__name__.startswith("FeatureSelect"):
                     tfnames = clf.transformer_.transform(feature_names)[0]
@@ -157,11 +175,11 @@ def benchmark(clf, clf_descr=None):
                     tfnames = feature_names
                 print("%s\n %s" % (category, ' '.
                                    join(tfnames[top_terms]).encode('utf-8')))
+
         print()
 
     if opts.print_report:
         print("classification report:")
-        categories = data_train.target_names
         print(metrics.classification_report(y_test, pred,
                                             target_names=categories))
 
@@ -171,47 +189,31 @@ def benchmark(clf, clf_descr=None):
 
     if clf_descr is None:
         clf_descr = str(clf).split('(')[0]
+
     return clf_descr, score, train_time, test_time
 
 
 results = [["Classifier", "Score", "Train.Time", "Test.Time"]]
-for clf, name in (
-        (RidgeClassifier(alpha=8.0, solver="sparse_cg"), "Ridge Classifier"),
-        (Perceptron(n_iter=50, alpha=1.0), "Perceptron"),
-        (PassiveAggressiveClassifier(n_iter=10, C=0.1), "Passive-Aggressive")):
-
-    # (KNeighborsClassifier(n_neighbors=10), "kNN")
+for clf in (
+    RidgeClassifier(alpha=8.0, solver="sparse_cg"),
+    Perceptron(n_iter=50, alpha=1.0),
+    PassiveAggressiveClassifier(n_iter=10, C=0.1),
+    NearestCentroid(metric='cosine'),
+    KNeighborsClassifier(metric='cosine', algorithm='brute', n_neighbors=6),
+    MultinomialNB(alpha=1.5),
+    BernoulliNB(alpha=0.2, binarize=None)
+):
     print('=' * 80)
-    print(name)
+    print("Classifier: " + clf.__class__.__name__)
     results.append(benchmark(clf))
 
 for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("LinearSVC with %s penalty" % penalty.upper())
-    # Train Liblinear model
     results.append(benchmark(
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
         "LinearSVC (" + penalty.upper() + " penalty)"))
 
-
-def with_l1_feature_selection(class_T, **kwargs):
-    class FeatureSelect(class_T):
-
-        def fit(self, X, y):
-            # The smaller C, the stronger the regularization.
-            # The more regularization, the more sparsity.
-            self.transformer_ = class_T(penalty="l1", **kwargs)
-            print("before feture selection: " + str(X.shape))
-            X = self.transformer_.fit_transform(X, y)
-            print("after feature selection: " + str(X.shape))
-            return class_T.fit(self, X, y)
-
-        def predict(self, X):
-            X = self.transformer_.transform(X)
-            return class_T.predict(self, X)
-
-    FeatureSelect.__name__ += '_' + class_T.__name__
-    return FeatureSelect
 
 print('=' * 80)
 print("LinearSVC with L1-based feature selection")
@@ -225,7 +227,6 @@ results.append(benchmark(
 for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("Logistic Regression with %s penalty" % penalty.upper())
-    # Train Liblinear model
     results.append(benchmark(
         LogisticRegression(penalty=penalty, dual=False, tol=1e-3),
         "LogisticRegression (" + penalty.upper() + " penalty)"))
@@ -253,7 +254,6 @@ for penalty in ["l2", "l1"]:
 #                   l1_ratio=0.3),
 #     "SGD (elasticnet penalty)"))
 
-# Train SGD with L1-feature selection
 print('=' * 80)
 print("SGD L1 feature slection")
 results.append(benchmark(
@@ -262,19 +262,7 @@ results.append(benchmark(
     )(loss='log', alpha=.0001, n_iter=50),
     "SGD (L1-feature select)"))
 
-# Train NearestCentroid without threshold
-print('=' * 80)
-print("NearestCentroid (aka Rocchio classifier)")
-results.append(benchmark(NearestCentroid(metric='cosine')))
 
-# Train sparse Naive Bayes classifiers
-print('=' * 80)
-print("Naive Bayes")
-results.append(benchmark(MultinomialNB(alpha=1.5)))
-results.append(benchmark(BernoulliNB(alpha=0.2, binarize=None)))
-
-
-# # Train radial kernal svc
 # print('=' * 80)
 # print("Radial kernal svc")
 # results.append(benchmark(SVC(kernel='rbf')))
