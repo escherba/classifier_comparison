@@ -23,7 +23,7 @@ def with_l1_feature_selection(class_T, **kwargs):
             # The smaller C, the stronger the regularization.
             # The more regularization, the more sparsity.
             self.transformer_ = class_T(penalty="l1", **kwargs)
-            logger.info("before feture selection: " + str(X.shape))
+            logger.info("before feature selection: " + str(X.shape))
             X = self.transformer_.fit_transform(X, y)
             logger.info("after feature selection: " + str(X.shape))
             return class_T.fit(self, X, y)
