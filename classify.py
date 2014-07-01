@@ -107,13 +107,13 @@ t0 = time()
 PCA_components = 5
 
 
-class SVDPipeline(Pipeline):
+class PCAPipeline(Pipeline):
     def get_feature_names(self):
         component_count = self.steps[-1][1].n_components
         return ["pc" + str(x) for x in range(component_count)]
 
 
-class ContentPipeline(Pipeline):
+class FeaturePipeline(Pipeline):
     def get_feature_names(self):
         return self.steps[-1][1].get_feature_names()
 
@@ -125,22 +125,22 @@ else:
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                                  stop_words='english')
 
-content_pipeline = ContentPipeline([
+content_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
     ('vec', vectorizer),
 ])
-pca_pipeline = SVDPipeline([
+pca_pipeline = PCAPipeline([
     ('cont2', TextExtractor('content')),
     ('vectf', TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                               stop_words='english')),
     ('pca', TruncatedSVD(n_components=PCA_components))
 ])
-lang_pipeline = ContentPipeline([
+lang_pipeline = FeaturePipeline([
     ('cont3', TextExtractor('content')),
     ('lang', FeatureLang()),
     ('dvec', DictVectorizer()),
 ])
-len_pipeline = ContentPipeline([
+len_pipeline = FeaturePipeline([
     ('cont4', TextExtractor('content')),
     ('len', LengthVectorizer())
 ])
