@@ -20,7 +20,7 @@ extract_topics: topic_extraction.py
 		--n_features 4000 \
 		--categories spam
 
-fit_metrics.csv: classify.py
+fit_metrics.csv: classify.py lf_feat_extract.py lfcorpus_utils.py
 	python $< \
 		--top_terms 100 \
 		--data_dir $(CORPUS_DIR) \
