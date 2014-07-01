@@ -16,29 +16,30 @@ from argparse import ArgumentParser
 
 import numpy as np
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.feature_extraction.text import HashingVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
+from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_selection import SelectKBest, chi2
-from sklearn.linear_model import RidgeClassifier
+from sklearn.linear_model import RidgeClassifier, SGDClassifier, \
+    LogisticRegression, Perceptron, PassiveAggressiveClassifier
 from sklearn.svm import LinearSVC
 # from sklearn import svm
-from sklearn.linear_model import SGDClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.linear_model import Perceptron
-from sklearn.linear_model import PassiveAggressiveClassifier
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neighbors import NearestCentroid
+from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
 from sklearn.utils.extmath import density
 from sklearn import metrics
+from sklearn.pipeline import FeatureUnion
+from sklearn.decomposition import TruncatedSVD
+from sklearn.pipeline import Pipeline
+# from sklearn.preprocessing import StandardScaler, Normalizer
 
 from lfcorpus_utils import get_data_frames
-from lf_feat_extract import with_l1_feature_selection
+from lf_feat_extract import with_l1_feature_selection, TextExtractor, \
+    FeatureLang, LengthVectorizer
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s')
-
+logger = logging.getLogger(__name__)
 
 # parse commandline arguments
 op = ArgumentParser()
@@ -92,7 +93,7 @@ else:
     # Load custom corpus
     data_train, data_test = get_data_frames(
         opts.data_dir,
-        lambda line: json.loads(line)['content'])
+        lambda line: json.loads(line))
     categories = data_train.target_names
 
 print('data loaded')
@@ -102,24 +103,67 @@ y_train, y_test = data_train.target, data_test.target
 print("Extracting features from the training dataset "
       "using a sparse vectorizer")
 t0 = time()
+
+PCA_components = 5
+
+
+class SVDPipeline(Pipeline):
+    def get_feature_names(self):
+        component_count = self.steps[-1][1].n_components
+        return ["pc" + str(x) for x in range(component_count)]
+
+
+class ContentPipeline(Pipeline):
+    def get_feature_names(self):
+        return self.steps[-1][1].get_feature_names()
+
+
 if opts.use_hashing:
     vectorizer = HashingVectorizer(stop_words='english', non_negative=True,
                                    n_features=opts.n_features)
-    X_train = vectorizer.transform(data_train.data)
 else:
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                                  stop_words='english')
-    X_train = vectorizer.fit_transform(data_train.data)
+
+content_pipeline = ContentPipeline([
+    ('cont1', TextExtractor('content')),
+    ('vec', vectorizer),
+])
+pca_pipeline = SVDPipeline([
+    ('cont2', TextExtractor('content')),
+    ('vectf', TfidfVectorizer(sublinear_tf=True, max_df=0.4,
+                              stop_words='english')),
+    ('pca', TruncatedSVD(n_components=PCA_components))
+])
+lang_pipeline = ContentPipeline([
+    ('cont3', TextExtractor('content')),
+    ('lang', FeatureLang()),
+    ('dvec', DictVectorizer()),
+])
+len_pipeline = ContentPipeline([
+    ('cont4', TextExtractor('content')),
+    ('len', LengthVectorizer())
+])
+preprocess = FeatureUnion([
+    ('cp', content_pipeline),
+    ('lp', lang_pipeline),
+    # ('mp', len_pipeline)
+])
+
+if opts.use_hashing:
+    X_train = preprocess.transform(data_train.data)
+else:
+    X_train = preprocess.fit_transform(data_train.data)
 
 duration = time() - t0
-print("n_samples: %d, n_features: %d" % X_train.shape)
+print("X_train: n_samples: %d, n_features: %d" % X_train.shape)
 print()
 
 print("Extracting features from the test dataset using the same vectorizer")
 t0 = time()
-X_test = vectorizer.transform(data_test.data)
+X_test = preprocess.transform(data_test.data)
 duration = time() - t0
-print("n_samples: %d, n_features: %d" % X_test.shape)
+print("X_test: n_samples: %d, n_features: %d" % X_test.shape)
 print()
 
 
@@ -127,7 +171,10 @@ print()
 if opts.use_hashing:
     feature_names = None
 else:
-    feature_names = np.asarray(vectorizer.get_feature_names())
+    feature_names = np.asarray(preprocess.get_feature_names())
+    assert feature_names.shape[0] == X_train.shape[1] == X_test.shape[1], \
+        ("feature_names-len: %d, X-train-len:%d, X-test-len: %d" %
+         (feature_names.shape[0], X_train.shape[1], X_test.shape[1]))
 
 
 if opts.select_chi2:
@@ -146,10 +193,18 @@ if opts.select_chi2:
 # Benchmark classifiers
 def benchmark(clf, clf_descr=None):
     print('_' * 80)
-    print("Training: ")
+
+    if clf_descr is None:
+        clf_descr = str(clf).split('(')[0]
+
+    print("Training: " + clf_descr)
     print(clf)
     t0 = time()
-    clf.fit(X_train, y_train)
+    try:
+        clf.fit(X_train, y_train)
+    except ValueError as e:
+        logger.error(e)
+        return (clf_descr, 0, 0, 0)
     train_time = time() - t0
     print("train time: %0.3fs" % train_time)
 
@@ -186,9 +241,6 @@ def benchmark(clf, clf_descr=None):
     if opts.print_cm:
         print("confusion matrix:")
         print(metrics.confusion_matrix(y_test, pred))
-
-    if clf_descr is None:
-        clf_descr = str(clf).split('(')[0]
 
     return clf_descr, score, train_time, test_time
 
