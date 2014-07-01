@@ -29,12 +29,11 @@ from sklearn.utils.extmath import density
 from sklearn import metrics
 from sklearn.pipeline import FeatureUnion
 from sklearn.decomposition import TruncatedSVD
-from sklearn.pipeline import Pipeline
 # from sklearn.preprocessing import StandardScaler, Normalizer
 
 from lfcorpus_utils import get_data_frames
 from lf_feat_extract import with_l1_feature_selection, TextExtractor, \
-    FeatureLang, LengthVectorizer
+    FeatureLang, LengthVectorizer, FeaturePipeline, PCAPipeline
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
@@ -107,22 +106,11 @@ t0 = time()
 PCA_components = 5
 
 
-class PCAPipeline(Pipeline):
-    def get_feature_names(self):
-        component_count = self.steps[-1][1].n_components
-        return ["pc" + str(x) for x in range(component_count)]
-
-
-class FeaturePipeline(Pipeline):
-    def get_feature_names(self):
-        return self.steps[-1][1].get_feature_names()
-
-
 if opts.use_hashing:
     vectorizer = HashingVectorizer(stop_words='english', non_negative=True,
                                    n_features=opts.n_features)
 else:
-    vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.4,
+    vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.3,
                                  stop_words='english')
 
 content_pipeline = FeaturePipeline([
@@ -296,23 +284,22 @@ for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("SGD with %s penalty" % penalty.upper())
     results.append(benchmark(
-        SGDClassifier(loss='hinge', alpha=.0001, n_iter=50, penalty=penalty),
+        SGDClassifier(loss='hinge', alpha=1e-4, n_iter=50, penalty=penalty),
         "SGD (" + penalty.upper() + " penalty)"))
 
 # print('=' * 80)
 # print("SGD with elasticnet penalty")
 # results.append(benchmark(
-#     SGDClassifier(loss='hinge', alpha=3e-5, n_iter=50, penalty='elasticnet',
-#                   l1_ratio=0.3),
+#     SGDClassifier(loss='hinge', alpha=1e-4, n_iter=50, penalty='elasticnet',
+#                   l1_ratio=0.10),
 #     "SGD (elasticnet penalty)"))
 
 print('=' * 80)
-print("SGD L1 feature slection")
-results.append(benchmark(
-    with_l1_feature_selection(
+print("SGD L1 feature selection")
+clf = with_l1_feature_selection(
         SGDClassifier, loss='log', alpha=0.00021, n_iter=10
-    )(loss='log', alpha=.0001, n_iter=50),
-    "SGD (L1-feature select)"))
+    )(loss='hinge', alpha=.0001, n_iter=50)
+results.append(benchmark(clf, "SGD (L1-feature select)"))
 
 
 # print('=' * 80)
