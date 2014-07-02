@@ -1,0 +1,4 @@
+-e git+https://github.com/escherba/omnihack.git#egg=omnihack
+langid==1.1dev
+nltk==2.0.4
+scikit-learn==0.14.1
