@@ -32,6 +32,7 @@ from sklearn.decomposition import TruncatedSVD
 # from sklearn.preprocessing import StandardScaler, Normalizer
 
 from lfcorpus_utils import get_data_frames
+from lfcorpus_utils import get_data_frame
 from lf_feat_extract import with_l1_feature_selection, TextExtractor, \
     FeatureLang, LengthVectorizer, FeaturePipeline, PCAPipeline
 
@@ -60,6 +61,10 @@ op.add_argument("--n_features",
                 help="n_features when using the hashing vectorizer.")
 op.add_argument("--data_dir", type=str,
                 help="data directory")
+op.add_argument("--data_train", type=str,
+                help="data directory")
+op.add_argument("--data_test", type=str,
+                help="data directory")
 op.add_argument("--output", type=str,
                 help="output path")
 
@@ -68,8 +73,6 @@ opts = op.parse_args()
 
 if opts.output is None:
     op.error('Output path not given')
-
-
 if opts.data_dir is None:
     # Load 20 newsgroups corpus
     from sklearn.datasets import fetch_20newsgroups
@@ -88,6 +91,18 @@ if opts.data_dir is None:
     data_test = fetch_20newsgroups(subset='test', categories=categories,
                                    shuffle=True, random_state=42,
                                    remove=fields_to_remove)
+
+if opts.data_train and opts.data_test:
+    data_train = get_data_frame(
+                opts.data_train,
+        lambda line: json.loads(line))
+    categories = data_train.target_names
+
+    data_test = get_data_frame(
+                opts.data_test,
+        lambda line: json.loads(line))
+
+
 else:
     # Load custom corpus
     data_train, data_test = get_data_frames(
@@ -239,7 +254,7 @@ for clf in (
     Perceptron(n_iter=50, alpha=1.0),
     PassiveAggressiveClassifier(n_iter=10, C=0.1),
     NearestCentroid(metric='cosine'),
-    KNeighborsClassifier(metric='cosine', algorithm='brute', n_neighbors=6),
+    # KNeighborsClassifier(metric='cosine', algorithm='brute', n_neighbors=6),
     MultinomialNB(alpha=1.5),
     BernoulliNB(alpha=0.2, binarize=None)
 ):
