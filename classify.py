@@ -53,8 +53,9 @@ op.add_argument("--confusion_matrix",
                 help="Print the confusion matrix.")
 op.add_argument("--top_terms", type=int, dest="top_terms",
                 help="Print most discriminative terms per class.")
-op.add_argument("--use_hashing", action="store_true",
-                help="Use a hashing vectorizer.")
+op.add_argument("--vectorizer", type=str, default="tfidf",
+                choices=["tfidf", "hashing"],
+                help="Vectorizer to use")
 op.add_argument("--n_features",
                 action="store", type=int, default=2 ** 16,
                 help="n_features when using the hashing vectorizer.")
@@ -106,10 +107,10 @@ t0 = time()
 PCA_components = 5
 
 
-if opts.use_hashing:
+if opts.vectorizer == "hashing":
     vectorizer = HashingVectorizer(stop_words='english', non_negative=True,
                                    n_features=opts.n_features)
-else:
+elif opts.vectorizer == "tfidf":
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.3,
                                  stop_words='english')
 
@@ -138,9 +139,9 @@ preprocess = FeatureUnion([
     # ('mp', len_pipeline)
 ])
 
-if opts.use_hashing:
+if opts.vectorizer == "hashing":
     X_train = preprocess.transform(data_train.data)
-else:
+elif opts.vectorizer == "tfidf":
     X_train = preprocess.fit_transform(data_train.data)
 
 duration = time() - t0
@@ -156,9 +157,9 @@ print()
 
 
 # mapping from integer feature name to original token string
-if opts.use_hashing:
+if opts.vectorizer == "hashing":
     feature_names = None
-else:
+elif opts.vectorizer == "tfidf":
     feature_names = np.asarray(preprocess.get_feature_names())
     assert feature_names.shape[0] == X_train.shape[1] == X_test.shape[1], \
         ("feature_names-len: %d, X-train-len:%d, X-test-len: %d" %
@@ -297,7 +298,7 @@ for penalty in ["l2", "l1"]:
 print('=' * 80)
 print("SGD L1 feature selection")
 clf = with_l1_feature_selection(
-        SGDClassifier, loss='log', alpha=0.00021, n_iter=10
+    SGDClassifier, loss='log', alpha=0.00021, n_iter=10
     )(loss='hinge', alpha=.0001, n_iter=50)
 results.append(benchmark(clf, "SGD (L1-feature select)"))
 

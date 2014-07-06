@@ -20,8 +20,9 @@ logging.basicConfig(level=logging.INFO,
 
 # parse commandline arguments
 op = ArgumentParser()
-op.add_argument("--use_hashing", action="store_true",
-                help="Use a hashing vectorizer.")
+op.add_argument("--vectorizer", type=str, default="tfidf",
+                choices=["tfidf", "hashing"],
+                help="Vectorizer to use")
 op.add_argument("--n_features",
                 action="store", type=int, default=2 ** 16,
                 help="n_features when using the hashing vectorizer.")
@@ -53,23 +54,20 @@ y_train = data_train.target
 print("Extracting features from the training dataset "
       "using a sparse vectorizer")
 t0 = time()
-if args.use_hashing:
+if args.vectorizer == "hashing":
     vectorizer = HashingVectorizer(stop_words='english', non_negative=True,
                                    n_features=args.n_features)
     X_train = vectorizer.transform(data_train.data)
-else:
+    # mapping from integer feature name to original token string
+    feature_names = None
+elif args.vectorizer == "tfidf":
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                                  stop_words='english')
     X_train = vectorizer.fit_transform(data_train.data)
     duration = time() - t0
     print("n_samples: %d, n_features: %d" % X_train.shape)
     print()
-
-
-# mapping from integer feature name to original token string
-if args.use_hashing:
-    feature_names = None
-else:
+    # mapping from integer feature name to original token string
     feature_names = np.asarray(vectorizer.get_feature_names())
 
 

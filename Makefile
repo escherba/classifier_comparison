@@ -10,7 +10,8 @@ plot_py: plot.py fit_metrics.csv
 
 pca: pca.py
 	python $< \
-		--method NMF \
+		--method SVD \
+		--vectorizer tfidf \
 		--data_dir $(CORPUS_DIR)
 
 extract_topics: topic_extraction.py
