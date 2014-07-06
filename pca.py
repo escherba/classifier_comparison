@@ -9,7 +9,6 @@ from argparse import ArgumentParser
 from time import time
 from lfcorpus_utils import get_data_frame
 
-from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer
 
@@ -26,19 +25,26 @@ op.add_argument("--use_hashing", action="store_true",
 op.add_argument("--n_features",
                 action="store", type=int, default=2 ** 16,
                 help="n_features when using the hashing vectorizer.")
+op.add_argument("--method", default="SVD", type=str, choices=["NMF", "SVD"],
+                help="Decomposition method to use")
 op.add_argument("--data_dir", type=str,
                 help="data directory")
 
 
-opts = op.parse_args()
-if opts.data_dir is None:
+args = op.parse_args()
+if args.data_dir is None:
     op.error('Data directory not given')
-    if opts.output is None:
-        op.error('Output path not given')
+
+if args.method == "NMF":
+    from sklearn.decomposition import NMF as Decomposition
+elif args.method == "SVD":
+    from sklearn.decomposition import TruncatedSVD as Decomposition
+else:
+    op.error("Invalid decomposition method")
 
 
 data_train = get_data_frame(
-    opts.data_dir,
+    args.data_dir,
     lambda line: json.loads(line)['content'])
 
 # split a training set and a test set
@@ -47,9 +53,9 @@ y_train = data_train.target
 print("Extracting features from the training dataset "
       "using a sparse vectorizer")
 t0 = time()
-if opts.use_hashing:
+if args.use_hashing:
     vectorizer = HashingVectorizer(stop_words='english', non_negative=True,
-                                   n_features=opts.n_features)
+                                   n_features=args.n_features)
     X_train = vectorizer.transform(data_train.data)
 else:
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.4,
@@ -61,14 +67,14 @@ else:
 
 
 # mapping from integer feature name to original token string
-if opts.use_hashing:
+if args.use_hashing:
     feature_names = None
 else:
     feature_names = np.asarray(vectorizer.get_feature_names())
 
 
 # Perform PCA
-pca = TruncatedSVD(n_components=2)
+pca = Decomposition(n_components=2)
 ox = pca.fit_transform(X_train, y_train)
 
 # Plot results split by classes
