@@ -14,14 +14,18 @@ import itertools as it
 from argparse import ArgumentParser
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction import DictVectorizer
 from sklearn.linear_model import SGDClassifier
 from sklearn.grid_search import GridSearchCV
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.preprocessing import Normalizer
 
 from lf_feat_extract import LemmaTokenizer
 
 from lfcorpus_utils import get_data_frame
+from lf_feat_extract import TextExtractor, \
+    FeatureLang, LengthVectorizer, FeaturePipeline
 
 op = ArgumentParser()
 op.add_argument("--scoring", type=str,
@@ -48,7 +52,7 @@ else:
     # Load custom corpus
     data = get_data_frame(
         args.data_dir,
-        lambda line: json.loads(line)['content'])
+        lambda line: json.loads(line))
     categories = data.target_names
 
 print("%d documents" % len(data.filenames))
@@ -58,12 +62,50 @@ print()
 ###############################################################################
 # define a pipeline combining a text feature extractor with a simple
 # classifier
-pipeline = Pipeline([
-    ('vect', CountVectorizer(lowercase=True, stop_words="english", max_df=0.30)),
-    ('tfidf', TfidfTransformer(sublinear_tf=True)),
-    ('norm', Normalizer()),
-    ('clf', SGDClassifier(penalty='elasticnet', n_iter=50)),
+
+
+vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.3,
+                             stop_words='english')
+
+content_pipeline = FeaturePipeline([
+    ('cont1', TextExtractor('content')),
+    ('vec', vectorizer),
 ])
+# pca_pipeline = PCAPipeline([
+#     ('cont2', TextExtractor('content')),
+#     ('vectf', TfidfVectorizer(sublinear_tf=True, max_df=0.4,
+#                               stop_words='english')),
+#     ('pca', TruncatedSVD(n_components=PCA_components))
+# ])
+lang_pipeline = FeaturePipeline([
+    ('cont3', TextExtractor('content')),
+    ('lang', FeatureLang()),
+    ('dvec', DictVectorizer()),
+])
+len_pipeline = FeaturePipeline([
+    ('cont4', TextExtractor('content')),
+    ('len', LengthVectorizer())
+])
+preprocess = FeatureUnion([
+    ('cp', content_pipeline),
+    #('lp', lang_pipeline),
+    # ('mp', len_pipeline)
+])
+
+# pipeline = Pipeline([
+#     ('vect', CountVectorizer(lowercase=True, stop_words="english", max_df=0.30)),
+#     ('tfidf', TfidfTransformer(sublinear_tf=True)),
+#     ('norm', Normalizer()),
+#     ('clf', SGDClassifier(penalty='elasticnet', n_iter=50)),
+# ])
+
+pipeline = Pipeline([
+    ('fp', preprocess),
+    ('norm', Normalizer()),
+    ('clf', SGDClassifier(alpha=1e-4, l1_ratio=0.10, penalty='elasticnet', n_iter=50)),
+])
+
+from IPython import embed; embed()
 
 # uncommenting more parameters will give better exploring power but will
 # increase processing time in a combinatorial way
@@ -79,11 +121,10 @@ pipeline = Pipeline([
 # 'clf__n_iter': (10, 50, 80),
 
 param_grid = [
-    {'vect__tokenizer': [LemmaTokenizer(), None],
-     'vect__max_df': [0.20, 0.30, 0.40],
+    {'fp__cp__vec__max_df': [0.1, 0.2, 0.3],
      'clf__loss': ['hinge'],
-     'clf__alpha': [1e-3],
-     'clf__l1_ratio': [0.30]},
+     'clf__alpha': [1e-2, 1e-3, 1e-4],
+     'clf__l1_ratio': [0.00, 0.10, 0.20, 0.30]},
 
     # {'clf__loss': ['log'],
     # 'clf__alpha': [ 1e-4, 1e-6 ],
