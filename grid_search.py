@@ -27,6 +27,9 @@ from lfcorpus_utils import get_data_frame
 from lf_feat_extract import TextExtractor, \
     FeatureLang, LengthVectorizer, FeaturePipeline
 
+import nltk
+nltk.data.path.append('./corpora/nltk_data/')
+
 op = ArgumentParser()
 op.add_argument("--scoring", type=str,
                 help="data directory")
