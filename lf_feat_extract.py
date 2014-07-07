@@ -3,8 +3,9 @@ import numpy as np
 
 from nltk import word_tokenize
 from nltk.stem import WordNetLemmatizer
-from sklearn import base
 from langid import classify as langid_classify
+from sklearn import base, metrics
+from sklearn.pipeline import Pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -81,3 +82,29 @@ class LengthVectorizer(base.BaseEstimator,
 
     def get_feature_names(self):
         return ["length"]
+
+
+class PCAPipeline(Pipeline):
+    def get_feature_names(self):
+        component_count = self.steps[-1][1].n_components
+        return ["pc" + str(x) for x in range(component_count)]
+
+
+class FeaturePipeline(Pipeline):
+    def get_feature_names(self):
+        return self.steps[-1][1].get_feature_names()
+
+
+class F1Scorer:
+    def __init__(self):
+        pass
+
+    def __call__(self, estimator, X, y):
+        pred = estimator.predict(X)
+        f1_score = metrics.f1_score(y, pred)
+        logger.info(estimator)
+        logger.info(estimator.steps[-1])
+        logger.info("F1-score: %f" % f1_score)
+        logger.info("X.shape = " + str(len(X)))
+        logger.info("y.shape = " + str(y.shape))
+        return f1_score

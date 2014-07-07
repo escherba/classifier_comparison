@@ -9,7 +9,10 @@ plot_py: plot.py fit_metrics.csv
 	python $^
 
 pca: pca.py
-	python $< --data_dir $(CORPUS_DIR)
+	python $< \
+		--method SVD \
+		--vectorizer tfidf \
+		--data_dir $(CORPUS_DIR)
 
 extract_topics: topic_extraction.py
 	python $< \

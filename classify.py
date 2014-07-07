@@ -29,12 +29,11 @@ from sklearn.utils.extmath import density
 from sklearn import metrics
 from sklearn.pipeline import FeatureUnion
 from sklearn.decomposition import TruncatedSVD
-from sklearn.pipeline import Pipeline
 # from sklearn.preprocessing import StandardScaler, Normalizer
 
 from lfcorpus_utils import get_data_frames
 from lf_feat_extract import with_l1_feature_selection, TextExtractor, \
-    FeatureLang, LengthVectorizer
+    FeatureLang, LengthVectorizer, FeaturePipeline, PCAPipeline
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
@@ -54,8 +53,9 @@ op.add_argument("--confusion_matrix",
                 help="Print the confusion matrix.")
 op.add_argument("--top_terms", type=int, dest="top_terms",
                 help="Print most discriminative terms per class.")
-op.add_argument("--use_hashing", action="store_true",
-                help="Use a hashing vectorizer.")
+op.add_argument("--vectorizer", type=str, default="tfidf",
+                choices=["tfidf", "hashing"],
+                help="Vectorizer to use")
 op.add_argument("--n_features",
                 action="store", type=int, default=2 ** 16,
                 help="n_features when using the hashing vectorizer.")
@@ -107,40 +107,29 @@ t0 = time()
 PCA_components = 5
 
 
-class SVDPipeline(Pipeline):
-    def get_feature_names(self):
-        component_count = self.steps[-1][1].n_components
-        return ["pc" + str(x) for x in range(component_count)]
-
-
-class ContentPipeline(Pipeline):
-    def get_feature_names(self):
-        return self.steps[-1][1].get_feature_names()
-
-
-if opts.use_hashing:
+if opts.vectorizer == "hashing":
     vectorizer = HashingVectorizer(stop_words='english', non_negative=True,
                                    n_features=opts.n_features)
-else:
-    vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.4,
+elif opts.vectorizer == "tfidf":
+    vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.3,
                                  stop_words='english')
 
-content_pipeline = ContentPipeline([
+content_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
     ('vec', vectorizer),
 ])
-pca_pipeline = SVDPipeline([
+pca_pipeline = PCAPipeline([
     ('cont2', TextExtractor('content')),
     ('vectf', TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                               stop_words='english')),
     ('pca', TruncatedSVD(n_components=PCA_components))
 ])
-lang_pipeline = ContentPipeline([
+lang_pipeline = FeaturePipeline([
     ('cont3', TextExtractor('content')),
     ('lang', FeatureLang()),
     ('dvec', DictVectorizer()),
 ])
-len_pipeline = ContentPipeline([
+len_pipeline = FeaturePipeline([
     ('cont4', TextExtractor('content')),
     ('len', LengthVectorizer())
 ])
@@ -150,9 +139,9 @@ preprocess = FeatureUnion([
     # ('mp', len_pipeline)
 ])
 
-if opts.use_hashing:
+if opts.vectorizer == "hashing":
     X_train = preprocess.transform(data_train.data)
-else:
+elif opts.vectorizer == "tfidf":
     X_train = preprocess.fit_transform(data_train.data)
 
 duration = time() - t0
@@ -168,9 +157,9 @@ print()
 
 
 # mapping from integer feature name to original token string
-if opts.use_hashing:
+if opts.vectorizer == "hashing":
     feature_names = None
-else:
+elif opts.vectorizer == "tfidf":
     feature_names = np.asarray(preprocess.get_feature_names())
     assert feature_names.shape[0] == X_train.shape[1] == X_test.shape[1], \
         ("feature_names-len: %d, X-train-len:%d, X-test-len: %d" %
@@ -296,23 +285,22 @@ for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("SGD with %s penalty" % penalty.upper())
     results.append(benchmark(
-        SGDClassifier(loss='hinge', alpha=.0001, n_iter=50, penalty=penalty),
+        SGDClassifier(loss='hinge', alpha=1e-4, n_iter=50, penalty=penalty),
         "SGD (" + penalty.upper() + " penalty)"))
 
 # print('=' * 80)
 # print("SGD with elasticnet penalty")
 # results.append(benchmark(
-#     SGDClassifier(loss='hinge', alpha=3e-5, n_iter=50, penalty='elasticnet',
-#                   l1_ratio=0.3),
+#     SGDClassifier(loss='hinge', alpha=1e-4, n_iter=50, penalty='elasticnet',
+#                   l1_ratio=0.10),
 #     "SGD (elasticnet penalty)"))
 
 print('=' * 80)
-print("SGD L1 feature slection")
-results.append(benchmark(
-    with_l1_feature_selection(
-        SGDClassifier, loss='log', alpha=0.00021, n_iter=10
-    )(loss='log', alpha=.0001, n_iter=50),
-    "SGD (L1-feature select)"))
+print("SGD L1 feature selection")
+clf = with_l1_feature_selection(
+    SGDClassifier, loss='log', alpha=0.00021, n_iter=10
+    )(loss='hinge', alpha=.0001, n_iter=50)
+results.append(benchmark(clf, "SGD (L1-feature select)"))
 
 
 # print('=' * 80)
