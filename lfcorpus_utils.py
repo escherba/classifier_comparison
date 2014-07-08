@@ -16,11 +16,11 @@ def get_category(fname):
     return os.path.basename(os.path.splitext(fname)[0])
 
 
-def get_data_frame(dirname, get_data, cat_filter=None):
+def get_data_frame(dirname, get_data, cat_filter=None, extension=".source"):
     category_codes = enumerator()
     x_nested = []
     y_nested = []
-    fnames = [fn for fn in get_files(dirname)]
+    fnames = [fn for fn in get_files(dirname, extension=extension)]
     num_files = len(fnames)
     max_num_lines = 0
     for fname in fnames:
@@ -62,16 +62,14 @@ def get_data_frame(dirname, get_data, cat_filter=None):
     )
 
 
-
-
-
-def get_data_frames(dirname, get_data, test_size=0.25, cat_filter=None):
+def get_data_frames(dirname, get_data, test_size=0.25, cat_filter=None,
+                    extension=".source"):
     category_codes = enumerator()
     x_training = []
     x_testing = []
     y_training = []
     y_testing = []
-    fnames = get_files(dirname)
+    fnames = get_files(dirname, extension=extension)
     for fname in fnames:
         cat_name = get_category(fname)
         if (cat_filter is not None) and (cat_name not in cat_filter):

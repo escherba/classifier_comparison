@@ -76,13 +76,15 @@ opts = op.parse_args()
 
 if opts.data_train and opts.data_test:
     data_train = get_data_frame(
-                opts.data_train,
-        lambda line: json.loads(line))
+        opts.data_train,
+        lambda line: json.loads(line),
+        extension=".timetest")
     categories = data_train.target_names
 
     data_test = get_data_frame(
-                opts.data_test,
-        lambda line: json.loads(line))
+        opts.data_test,
+        lambda line: json.loads(line),
+        extension=".timetest")
 
 elif opts.data_dir is None:
     # Load 20 newsgroups corpus
@@ -152,8 +154,8 @@ colloc_pipeline = FeaturePipeline([
 #    ('len', LengthVectorizer())
 #])
 preprocess = FeatureUnion([
-    #('cp', content_pipeline),
-    ('op', colloc_pipeline),
+    ('cp', content_pipeline),
+    #('op', colloc_pipeline),
     #('lp', lang_pipeline),
     # ('mp', len_pipeline)
 ])
