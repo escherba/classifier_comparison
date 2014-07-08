@@ -59,3 +59,11 @@ docs/_build/
 # Emacs
 \#*#
 
+
+# Domino
+.domino/
+.dominoignore
+results/
+
+# Data
+corpora/

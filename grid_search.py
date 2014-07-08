@@ -12,8 +12,8 @@ import json
 import itertools as it
 
 from argparse import ArgumentParser
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer
+# from sklearn.feature_extraction.text import CountVectorizer
+# from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.linear_model import SGDClassifier
@@ -21,19 +21,31 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.preprocessing import Normalizer
 
-from lf_feat_extract import LemmaTokenizer
+# from lf_feat_extract import LemmaTokenizer
 
 from lfcorpus_utils import get_data_frame
 from lf_feat_extract import TextExtractor, \
     FeatureLang, LengthVectorizer, FeaturePipeline
+
+import nltk
+nltk.data.path.append('./corpora/nltk_data/')
 
 op = ArgumentParser()
 op.add_argument("--scoring", type=str,
                 help="data directory")
 op.add_argument("--data_dir", type=str,
                 help="data directory")
+op.add_argument("--output_basename", type=str, default='Untitled',
+                help="basename of file containing json dict output for combining")
+
+op.add_argument('--shard', type=int, default=0,
+                help="which split of the data are we")
+op.add_argument('--n_shards', type=int, default=1,
+                help="number of data splits")
 
 args = op.parse_args()
+
+assert 0 <= args.shard < args.n_shards
 
 
 # Display progress logs on stdout
@@ -105,8 +117,6 @@ pipeline = Pipeline([
     ('clf', SGDClassifier(alpha=1e-4, l1_ratio=0.10, penalty='elasticnet', n_iter=50)),
 ])
 
-from IPython import embed; embed()
-
 # uncommenting more parameters will give better exploring power but will
 # increase processing time in a combinatorial way
 
@@ -131,6 +141,47 @@ param_grid = [
     # 'clf__l1_ratio': [ 0.40, 0.60 ]}
 ]
 
+def one_from_each_list(aaa):
+    """list of lists -> all combinations of one from each list."""
+    if not all(aaa):
+        return
+
+    aaa = map(tuple, aaa)
+    zz = map(lambda aa: len(aa) - 1, aaa)
+    ii = [0] * len(aaa)
+    while True:
+        yield map(lambda (aa, i): aa[i], zip(aaa, ii))
+        ok = False
+        for pos in range(len(ii)):
+            if ii[pos] == zz[pos]:
+                ii[pos] = 0
+            else:
+                ii[pos] += 1
+                ok = True
+                break
+        if not ok:
+            break
+
+def flatten_param_grid_dict(d):
+    """(k -> vv) -> equivalent list of (k -> v)."""
+    keys = d.keys()
+    values = d.values()
+    for new_values in one_from_each_list(values):
+        new_d = dict(zip(keys, map(lambda v: [v], new_values)))
+        yield new_d
+
+def get_param_grid_shard(param_grid, shard, n_shards):
+    dd = []
+    for d in param_grid:
+        dd += list(flatten_param_grid_dict(d))
+    min_x = len(dd) * shard / n_shards
+    max_x = len(dd) * (shard + 1) / n_shards
+    print('selecting subset: [%d : %d) of %d' % (min_x, max_x, len(dd)))
+    sub_dd = dd[min_x:max_x]
+    return sub_dd
+
+param_grid = get_param_grid_shard(param_grid, args.shard, args.n_shards)
+
 if __name__ == "__main__":
     # multiprocessing requires the fork to happen in a __main__ protected
     # block
@@ -153,5 +204,17 @@ if __name__ == "__main__":
     print("Best parameters set:")
     best_parameters = grid_search.best_estimator_.get_params()
     parameters_tested = set(it.chain(*(i.keys() for i in param_grid)))
+    bp = []
     for param_name in sorted(parameters_tested):
-        print("\t%s: %r" % (param_name, best_parameters[param_name]))
+        k = param_name
+        v = best_parameters[param_name]
+        print("\t%s: %r" % (param_name, v))
+        bp.append((k, v))
+
+    d = {
+        'best_score': grid_search.best_score_.astype(float),
+        'best_parameters': bp,
+    }
+    f = '%s.%d.txt' % (args.output_basename, args.shard)
+    s = json.dumps(d)
+    open(f, 'w').write(s)
