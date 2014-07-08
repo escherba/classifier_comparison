@@ -79,15 +79,20 @@ class ChiSqBigramFinder(base.BaseEstimator,
 class TextExtractor(base.BaseEstimator,
                     base.TransformerMixin):
 
-    def __init__(self, column):
+    def __init__(self, column, lowercase=False):
         self.column = column
+        self.lowercase = lowercase
 
     def fit(self, X, y=None):
         return self
 
     def transform(self, X, y=None):
         column = self.column
-        return np.asarray([row[column] for row in X], dtype=np.unicode)
+        if self.lowercase:
+            result = [row[column].lower() for row in X]
+        else:
+            result = [row[column] for row in X]
+        return np.asarray(result,  dtype=np.unicode)
 
     def get_feature_names(self):
         return [self.column]

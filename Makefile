@@ -9,6 +9,7 @@ env: requirements.txt
 	test -d env || virtualenv --no-site-packages env
 	$(PYENV) pip install -r requirements.txt
 	$(PYENV) pip install matplotlib
+	$(PYENV) easy_install ipython
 
 plot: index.html index.js $(PLOT_INTERMEDIATE).csv
 	open -a "Safari" $<
