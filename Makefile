@@ -2,7 +2,7 @@
 
 CORPUS_DIR=~/dev/py-nlp/var/corpora/livefyre
 CORPUS_DIR2=~/dev/py-nlp/var/corpora/livefyre/dec17
-CORPUS_DIR3=~/dev/py-nlp/var/corpora/livefyre/jan14
+CORPUS_DIR3=~/dev/py-nlp/var/corpora/livefyre/dec29
 
 plot: index.html index.js fit_metrics.csv
 	open -a "Safari" $<
