@@ -123,8 +123,8 @@ pca_pipeline = PCAPipeline([
 ])
 colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
-    ('coll', ChiSqBigramFinder(score_thr=80)),
-    ('vectc', FeatureHasher(input_type="string"))
+    ('coll', ChiSqBigramFinder(score_thr=50)),
+    ('vectc', FeatureHasher(input_type="string", non_negative=True))
 ])
 #lang_pipeline = FeaturePipeline([
 #    ('cont3', TextExtractor('content')),
@@ -136,7 +136,7 @@ colloc_pipeline = FeaturePipeline([
 #    ('len', LengthVectorizer())
 #])
 preprocess = FeatureUnion([
-    ('cp', content_pipeline),
+    #('cp', content_pipeline),
     ('op', colloc_pipeline),
     #('lp', lang_pipeline),
     # ('mp', len_pipeline)
