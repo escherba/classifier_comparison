@@ -46,7 +46,7 @@ $(PLOT_INTERMEDIATE).csv: classify.py lf_feat_extract.py lfcorpus_utils.py
 	$(PYTHON) $< \
 		--vectorizer hashing \
 		--top_terms 100 \
-		--data_dir $(CORPUS_DIR2) \
+		--data_dir $(CORPUS_DIR) \
 		--output $@
 
 fit_metrics2.csv: classify.py lf_feat_extract.py lfcorpus_utils.py

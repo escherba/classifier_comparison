@@ -10,6 +10,7 @@ from __future__ import print_function
 import logging
 import csv
 import json
+import sys
 
 from time import time
 from argparse import ArgumentParser
@@ -75,6 +76,7 @@ op.add_argument("--output", type=str,
 opts = op.parse_args()
 
 if opts.data_train and opts.data_test:
+    print("manually specified corpus")
     data_train = get_data_frame(
         opts.data_train,
         lambda line: json.loads(line),
@@ -88,6 +90,7 @@ if opts.data_train and opts.data_test:
 
 elif opts.data_dir is None:
     # Load 20 newsgroups corpus
+    print("loading 20 newsgroups corpus")
     from sklearn.datasets import fetch_20newsgroups
     categories = [
         'alt.atheism',
@@ -106,10 +109,19 @@ elif opts.data_dir is None:
                                    remove=fields_to_remove)
 else:
     # Load custom corpus
+    print("loading custom corpus")
     data_train, data_test = get_data_frames(
         opts.data_dir,
         lambda line: json.loads(line))
     categories = data_train.target_names
+
+if len(data_train.data) == 0:
+    logger.error("No training data loaded")
+    sys.exit(1)
+
+if len(data_test.data) == 0:
+    logger.error("No testing data loaded")
+    sys.exit(1)
 
 print('data loaded')
 
