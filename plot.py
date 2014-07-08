@@ -41,4 +41,7 @@ pl.grid(b=None, which='major', axis='both')
 for i, c in zip(indices, clf_names):
     pl.text(-.3, i, c)
 
-pl.show()
+if len(sys.argv) <= 2:
+    pl.show()
+else:
+    pl.savefig(sys.argv[2])

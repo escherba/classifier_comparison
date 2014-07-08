@@ -6,6 +6,8 @@ from nltk.stem import WordNetLemmatizer
 from langid import classify as langid_classify
 from sklearn import base, metrics
 from sklearn.pipeline import Pipeline
+from nltk.collocations import BigramCollocationFinder
+from nltk.metrics import BigramAssocMeasures
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,26 @@ class FeatureLang(base.BaseEstimator,
         return ["language"]
 
 
+class ChiSqBigramFinder(base.BaseEstimator,
+                        base.TransformerMixin):
+
+    def __init__(self, score_thr=50):
+        self.score_thr = score_thr
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X, y=None):
+        result = []
+        scorer = (BigramAssocMeasures.chi_sq, self.score_thr)
+        for x in X:
+            g_finder = BigramCollocationFinder.from_words(x)
+            bigrams = g_finder.above_score(*scorer)
+            processed = {str(b): True for b in bigrams}
+            result.append(processed)
+        return result
+
+
 class TextExtractor(base.BaseEstimator,
                     base.TransformerMixin):
 
@@ -64,8 +86,8 @@ class TextExtractor(base.BaseEstimator,
         return self
 
     def transform(self, X, y=None):
-        col = self.column
-        return np.asarray([row[col] for row in X], dtype=np.unicode)
+        column = self.column
+        return np.asarray([row[column] for row in X], dtype=np.unicode)
 
     def get_feature_names(self):
         return [self.column]

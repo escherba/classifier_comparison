@@ -29,13 +29,9 @@ op.add_argument("--n_features",
 op.add_argument("--method", default="SVD", type=str, choices=["NMF", "SVD"],
                 help="Decomposition method to use")
 op.add_argument("--data_dir", type=str,
-                help="data directory")
-
+                help="Data directory", required=True)
 
 args = op.parse_args()
-if args.data_dir is None:
-    op.error('Data directory not given')
-
 if args.method == "NMF":
     from sklearn.decomposition import NMF as Decomposition
 elif args.method == "SVD":

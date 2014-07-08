@@ -26,12 +26,9 @@ op.add_argument("--n_top_words", default=20, type=int,
 op.add_argument("--categories", nargs="+", type=str,
                 help="number of top words to print")
 op.add_argument("--data_dir", type=str,
-                help="data directory")
+                help="data directory", required=True)
+
 args = op.parse_args()
-
-if args.data_dir is None:
-    op.error('Data directory not given')
-
 if args.method == "NMF":
     from sklearn.decomposition import NMF as Decomposition
 elif args.method == "SVD":
