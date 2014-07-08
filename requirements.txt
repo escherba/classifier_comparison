@@ -1,0 +1,6 @@
+numpy==1.8.0
+scipy==0.13.0
+scikit-learn==0.15.0b1
+langid==1.1.4dev
+nltk==2.0.4
+-e git+https://github.com/escherba/omnihack.git#egg=omnihack

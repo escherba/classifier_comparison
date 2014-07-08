@@ -16,8 +16,9 @@ from argparse import ArgumentParser
 
 import numpy as np
 
-from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
-from sklearn.feature_extraction import DictVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, \
+    HashingVectorizer
+from sklearn.feature_extraction import DictVectorizer, FeatureHasher
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.linear_model import RidgeClassifier, SGDClassifier, \
     LogisticRegression, Perceptron, PassiveAggressiveClassifier
@@ -34,7 +35,8 @@ from sklearn.decomposition import TruncatedSVD
 from lfcorpus_utils import get_data_frames
 from lfcorpus_utils import get_data_frame
 from lf_feat_extract import with_l1_feature_selection, TextExtractor, \
-    FeatureLang, LengthVectorizer, FeaturePipeline, PCAPipeline
+    FeatureLang, LengthVectorizer, FeaturePipeline, PCAPipeline, \
+    ChiSqBigramFinder
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
@@ -54,8 +56,9 @@ op.add_argument("--confusion_matrix",
                 help="Print the confusion matrix.")
 op.add_argument("--top_terms", type=int, dest="top_terms",
                 help="Print most discriminative terms per class.")
-op.add_argument("--use_hashing", action="store_true",
-                help="Use a hashing vectorizer.")
+op.add_argument("--vectorizer", type=str, default="tfidf",
+                choices=["tfidf", "hashing"],
+                help="Vectorizer to use")
 op.add_argument("--n_features",
                 action="store", type=int, default=2 ** 16,
                 help="n_features when using the hashing vectorizer.")
@@ -66,14 +69,22 @@ op.add_argument("--data_train", type=str,
 op.add_argument("--data_test", type=str,
                 help="data directory")
 op.add_argument("--output", type=str,
-                help="output path")
+                help="output path", required=True)
 
 
 opts = op.parse_args()
 
-if opts.output is None:
-    op.error('Output path not given')
-if opts.data_dir is None:
+if opts.data_train and opts.data_test:
+    data_train = get_data_frame(
+                opts.data_train,
+        lambda line: json.loads(line))
+    categories = data_train.target_names
+
+    data_test = get_data_frame(
+                opts.data_test,
+        lambda line: json.loads(line))
+
+elif opts.data_dir is None:
     # Load 20 newsgroups corpus
     from sklearn.datasets import fetch_20newsgroups
     categories = [
@@ -91,18 +102,6 @@ if opts.data_dir is None:
     data_test = fetch_20newsgroups(subset='test', categories=categories,
                                    shuffle=True, random_state=42,
                                    remove=fields_to_remove)
-
-if opts.data_train and opts.data_test:
-    data_train = get_data_frame(
-                opts.data_train,
-        lambda line: json.loads(line))
-    categories = data_train.target_names
-
-    data_test = get_data_frame(
-                opts.data_test,
-        lambda line: json.loads(line))
-
-
 else:
     # Load custom corpus
     data_train, data_test = get_data_frames(
@@ -121,10 +120,10 @@ t0 = time()
 PCA_components = 5
 
 
-if opts.use_hashing:
+if opts.vectorizer == "hashing":
     vectorizer = HashingVectorizer(stop_words='english', non_negative=True,
                                    n_features=opts.n_features)
-else:
+elif opts.vectorizer == "tfidf":
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.3,
                                  stop_words='english')
 
@@ -138,24 +137,30 @@ pca_pipeline = PCAPipeline([
                               stop_words='english')),
     ('pca', TruncatedSVD(n_components=PCA_components))
 ])
-lang_pipeline = FeaturePipeline([
-    ('cont3', TextExtractor('content')),
-    ('lang', FeatureLang()),
-    ('dvec', DictVectorizer()),
+colloc_pipeline = FeaturePipeline([
+    ('cont1', TextExtractor('content')),
+    ('coll', ChiSqBigramFinder(score_thr=50)),
+    ('vectc', FeatureHasher(input_type="string", non_negative=True))
 ])
-len_pipeline = FeaturePipeline([
-    ('cont4', TextExtractor('content')),
-    ('len', LengthVectorizer())
-])
+#lang_pipeline = FeaturePipeline([
+#    ('cont3', TextExtractor('content')),
+#    ('lang', FeatureLang()),
+#    ('dvec', DictVectorizer()),
+#])
+#len_pipeline = FeaturePipeline([
+#    ('cont4', TextExtractor('content')),
+#    ('len', LengthVectorizer())
+#])
 preprocess = FeatureUnion([
-    ('cp', content_pipeline),
-    ('lp', lang_pipeline),
+    #('cp', content_pipeline),
+    ('op', colloc_pipeline),
+    #('lp', lang_pipeline),
     # ('mp', len_pipeline)
 ])
 
-if opts.use_hashing:
+if opts.vectorizer == "hashing":
     X_train = preprocess.transform(data_train.data)
-else:
+elif opts.vectorizer == "tfidf":
     X_train = preprocess.fit_transform(data_train.data)
 
 duration = time() - t0
@@ -171,9 +176,9 @@ print()
 
 
 # mapping from integer feature name to original token string
-if opts.use_hashing:
+if opts.vectorizer == "hashing":
     feature_names = None
-else:
+elif opts.vectorizer == "tfidf":
     feature_names = np.asarray(preprocess.get_feature_names())
     assert feature_names.shape[0] == X_train.shape[1] == X_test.shape[1], \
         ("feature_names-len: %d, X-train-len:%d, X-test-len: %d" %
@@ -212,7 +217,11 @@ def benchmark(clf, clf_descr=None):
     print("train time: %0.3fs" % train_time)
 
     t0 = time()
-    pred = clf.predict(X_test)
+    try:
+        pred = clf.predict(X_test)
+    except TypeError as e:
+        logger.error(e)
+        return (clf_descr, 0, 0, 0)
     test_time = time() - t0
     print("test time:  %0.3fs" % test_time)
 
@@ -312,7 +321,7 @@ for penalty in ["l2", "l1"]:
 print('=' * 80)
 print("SGD L1 feature selection")
 clf = with_l1_feature_selection(
-        SGDClassifier, loss='log', alpha=0.00021, n_iter=10
+    SGDClassifier, loss='log', alpha=0.00021, n_iter=10
     )(loss='hinge', alpha=.0001, n_iter=50)
 results.append(benchmark(clf, "SGD (L1-feature select)"))
 
