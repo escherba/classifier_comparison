@@ -5,6 +5,7 @@ CORPUS_DIR=~/dev/py-nlp/var/corpora/livefyre
 plot: index.html index.js fit_metrics.csv
 	open -a "Safari" $<
 
+
 plot_py: plot.py fit_metrics.csv
 	python $^
 
