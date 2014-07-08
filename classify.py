@@ -16,8 +16,9 @@ from argparse import ArgumentParser
 
 import numpy as np
 
-from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
-from sklearn.feature_extraction import DictVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, \
+    HashingVectorizer
+from sklearn.feature_extraction import DictVectorizer, FeatureHasher
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.linear_model import RidgeClassifier, SGDClassifier, \
     LogisticRegression, Perceptron, PassiveAggressiveClassifier
@@ -33,7 +34,8 @@ from sklearn.decomposition import TruncatedSVD
 
 from lfcorpus_utils import get_data_frames
 from lf_feat_extract import with_l1_feature_selection, TextExtractor, \
-    FeatureLang, LengthVectorizer, FeaturePipeline, PCAPipeline
+    FeatureLang, LengthVectorizer, FeaturePipeline, PCAPipeline, \
+    ChiSqBigramFinder
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
@@ -62,15 +64,10 @@ op.add_argument("--n_features",
 op.add_argument("--data_dir", type=str,
                 help="data directory")
 op.add_argument("--output", type=str,
-                help="output path")
+                help="output path", required=True)
 
 
 opts = op.parse_args()
-
-if opts.output is None:
-    op.error('Output path not given')
-
-
 if opts.data_dir is None:
     # Load 20 newsgroups corpus
     from sklearn.datasets import fetch_20newsgroups
@@ -124,18 +121,24 @@ pca_pipeline = PCAPipeline([
                               stop_words='english')),
     ('pca', TruncatedSVD(n_components=PCA_components))
 ])
-lang_pipeline = FeaturePipeline([
-    ('cont3', TextExtractor('content')),
-    ('lang', FeatureLang()),
-    ('dvec', DictVectorizer()),
+colloc_pipeline = FeaturePipeline([
+    ('cont1', TextExtractor('content')),
+    ('coll', ChiSqBigramFinder(score_thr=80)),
+    ('vectc', FeatureHasher(input_type="string"))
 ])
-len_pipeline = FeaturePipeline([
-    ('cont4', TextExtractor('content')),
-    ('len', LengthVectorizer())
-])
+#lang_pipeline = FeaturePipeline([
+#    ('cont3', TextExtractor('content')),
+#    ('lang', FeatureLang()),
+#    ('dvec', DictVectorizer()),
+#])
+#len_pipeline = FeaturePipeline([
+#    ('cont4', TextExtractor('content')),
+#    ('len', LengthVectorizer())
+#])
 preprocess = FeatureUnion([
     ('cp', content_pipeline),
-    ('lp', lang_pipeline),
+    ('op', colloc_pipeline),
+    #('lp', lang_pipeline),
     # ('mp', len_pipeline)
 ])
 
@@ -198,7 +201,11 @@ def benchmark(clf, clf_descr=None):
     print("train time: %0.3fs" % train_time)
 
     t0 = time()
-    pred = clf.predict(X_test)
+    try:
+        pred = clf.predict(X_test)
+    except TypeError as e:
+        logger.error(e)
+        return (clf_descr, 0, 0, 0)
     test_time = time() - t0
     print("test time:  %0.3fs" % test_time)
 
