@@ -71,7 +71,7 @@ class ChiSqBigramFinder(base.BaseEstimator,
         for x in X:
             g_finder = BigramCollocationFinder.from_words(x)
             bigrams = g_finder.above_score(*scorer)
-            processed = {str(b): True for b in bigrams}
+            processed = (repr(b) for b in bigrams)
             result.append(processed)
         return result
 

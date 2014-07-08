@@ -17,7 +17,7 @@ from argparse import ArgumentParser
 import numpy as np
 
 from sklearn.feature_extraction.text import TfidfVectorizer, \
-    HashingVectorizer, CountVectorizer
+    HashingVectorizer
 from sklearn.feature_extraction import DictVectorizer, FeatureHasher
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.linear_model import RidgeClassifier, SGDClassifier, \
@@ -123,8 +123,8 @@ pca_pipeline = PCAPipeline([
 ])
 colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
-    ('coll', ChiSqBigramFinder(score_thr=30)),
-    ('vectc', FeatureHasher())
+    ('coll', ChiSqBigramFinder(score_thr=80)),
+    ('vectc', FeatureHasher(input_type="string"))
 ])
 #lang_pipeline = FeaturePipeline([
 #    ('cont3', TextExtractor('content')),
@@ -136,7 +136,7 @@ colloc_pipeline = FeaturePipeline([
 #    ('len', LengthVectorizer())
 #])
 preprocess = FeatureUnion([
-    #('cp', content_pipeline),
+    ('cp', content_pipeline),
     ('op', colloc_pipeline),
     #('lp', lang_pipeline),
     # ('mp', len_pipeline)
