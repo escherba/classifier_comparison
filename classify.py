@@ -153,7 +153,7 @@ pca_pipeline = PCAPipeline([
 ])
 colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
-    ('coll', ChiSqBigramFinder(score_thr=50)),
+    ('coll', ChiSqBigramFinder(score_thr=100)),
     ('vectc', FeatureHasher(input_type="string", non_negative=True))
 ])
 #lang_pipeline = FeaturePipeline([
@@ -167,7 +167,7 @@ colloc_pipeline = FeaturePipeline([
 #])
 preprocess = FeatureUnion([
     ('cp', content_pipeline),
-    #('op', colloc_pipeline),
+    ('op', colloc_pipeline),
     #('lp', lang_pipeline),
     # ('mp', len_pipeline)
 ])
@@ -277,7 +277,7 @@ for clf in (
     Perceptron(n_iter=50, alpha=1.0),
     PassiveAggressiveClassifier(n_iter=10, C=0.1),
     NearestCentroid(metric='cosine'),
-    # KNeighborsClassifier(metric='cosine', algorithm='brute', n_neighbors=6),
+    KNeighborsClassifier(metric='cosine', algorithm='brute', n_neighbors=6),
     MultinomialNB(alpha=1.5),
     BernoulliNB(alpha=0.2, binarize=None)
 ):
