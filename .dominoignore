@@ -62,7 +62,6 @@ docs/_build/
 
 # Domino
 .domino/
-.dominoignore
 results/
 
 # Data
