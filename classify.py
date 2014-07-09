@@ -10,6 +10,7 @@ from __future__ import print_function
 import logging
 import csv
 import json
+import sys
 
 from time import time
 from argparse import ArgumentParser
@@ -33,6 +34,7 @@ from sklearn.decomposition import TruncatedSVD
 # from sklearn.preprocessing import StandardScaler, Normalizer
 
 from lfcorpus_utils import get_data_frames
+from lfcorpus_utils import get_data_frame
 from lf_feat_extract import with_l1_feature_selection, TextExtractor, \
     FeatureLang, LengthVectorizer, FeaturePipeline, PCAPipeline, \
     ChiSqBigramFinder
@@ -63,13 +65,32 @@ op.add_argument("--n_features",
                 help="n_features when using the hashing vectorizer.")
 op.add_argument("--data_dir", type=str,
                 help="data directory")
+op.add_argument("--data_train", type=str,
+                help="data directory")
+op.add_argument("--data_test", type=str,
+                help="data directory")
 op.add_argument("--output", type=str,
                 help="output path", required=True)
 
 
 opts = op.parse_args()
-if opts.data_dir is None:
+
+if opts.data_train and opts.data_test:
+    print("manually specified corpus")
+    data_train = get_data_frame(
+        opts.data_train,
+        lambda line: json.loads(line),
+        extension=".timetest")
+    categories = data_train.target_names
+
+    data_test = get_data_frame(
+        opts.data_test,
+        lambda line: json.loads(line),
+        extension=".timetest")
+
+elif opts.data_dir is None:
     # Load 20 newsgroups corpus
+    print("loading 20 newsgroups corpus")
     from sklearn.datasets import fetch_20newsgroups
     categories = [
         'alt.atheism',
@@ -88,10 +109,19 @@ if opts.data_dir is None:
                                    remove=fields_to_remove)
 else:
     # Load custom corpus
+    print("loading custom corpus")
     data_train, data_test = get_data_frames(
         opts.data_dir,
         lambda line: json.loads(line))
     categories = data_train.target_names
+
+if len(data_train.data) == 0:
+    logger.error("No training data loaded")
+    sys.exit(1)
+
+if len(data_test.data) == 0:
+    logger.error("No testing data loaded")
+    sys.exit(1)
 
 print('data loaded')
 
@@ -123,8 +153,8 @@ pca_pipeline = PCAPipeline([
 ])
 colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
-    ('coll', ChiSqBigramFinder(score_thr=80)),
-    ('vectc', FeatureHasher(input_type="string"))
+    ('coll', ChiSqBigramFinder(score_thr=70)),
+    ('vectc', FeatureHasher(input_type="string", non_negative=True))
 ])
 #lang_pipeline = FeaturePipeline([
 #    ('cont3', TextExtractor('content')),
@@ -176,9 +206,10 @@ if opts.select_chi2:
     ch2 = SelectKBest(chi2, k=opts.select_chi2)
     X_train = ch2.fit_transform(X_train, y_train)
     X_test = ch2.transform(X_test)
-    feature_names = ch2.transform(feature_names)[0]
     print("done in %fs" % (time() - t0))
     print()
+    if feature_names:
+        feature_names = ch2.transform(feature_names)[0]
 
 
 ###############################################################################
