@@ -141,29 +141,29 @@ param_grid = [
     # 'clf__l1_ratio': [ 0.40, 0.60 ]}
 ]
 
-def one_from_each_list(aaa):
+def one_from_each_list(lists):
     """list of lists -> all combinations of one from each list."""
-    if not all(aaa):
+    if not all(lists):
         return
 
-    aaa = map(tuple, aaa)
-    zz = map(lambda aa: len(aa) - 1, aaa)
-    ii = [0] * len(aaa)
+    tuples = map(tuple, lists)
+    max_indexes = map(lambda aa: len(aa) - 1, tuples)
+    indexes = [0] * len(tuples)
     while True:
-        yield map(lambda (aa, i): aa[i], zip(aaa, ii))
+        yield map(lambda (aa, i): aa[i], zip(tuples, indexes))
         ok = False
-        for pos in range(len(ii)):
-            if ii[pos] == zz[pos]:
-                ii[pos] = 0
+        for pos in range(len(indexes)):
+            if indexes[pos] == max_indexes[pos]:
+                indexes[pos] = 0
             else:
-                ii[pos] += 1
+                indexes[pos] += 1
                 ok = True
                 break
         if not ok:
             break
 
 def flatten_param_grid_dict(d):
-    """(k -> vv) -> equivalent list of (k -> v)."""
+    """list of (k -> vv) -> equivalent list of (k -> v)."""
     keys = d.keys()
     values = d.values()
     for new_values in one_from_each_list(values):
@@ -171,9 +171,10 @@ def flatten_param_grid_dict(d):
         yield new_d
 
 def get_param_grid_shard(param_grid, shard, n_shards):
+    """get a new param grid that contains one shard's worth of work."""
     dd = []
     for d in param_grid:
-        dd += list(flatten_param_grid_dict(d))
+        dd.extend(flatten_param_grid_dict(d))
     min_x = len(dd) * shard / n_shards
     max_x = len(dd) * (shard + 1) / n_shards
     print('selecting subset: [%d : %d) of %d' % (min_x, max_x, len(dd)))
