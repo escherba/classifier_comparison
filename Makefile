@@ -14,8 +14,8 @@ env: requirements.txt
 	$(PYENV) pip install matplotlib
 	$(PYENV) easy_install ipython
 
-$(PLOT_INTERMEDIATE) $(PLOT_INTERMEDIATE2): %: %.html %.csv chart.js
-	open -a "Safari" $<
+$(PLOT_INTERMEDIATE) $(PLOT_INTERMEDIATE2): %: %.csv chart.scpt chart.html chart.js
+	osascript chart.scpt 'file://'`pwd`'/chart.html#'$<
 
 plot_py: $(PLOT_INTERMEDIATE).png
 	open -a "Preview" $^
