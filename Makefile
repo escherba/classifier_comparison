@@ -7,6 +7,7 @@ CORPUS_DIR2=~/dev/py-nlp/var/corpora/livefyre/dec17
 CORPUS_DIR3=~/dev/py-nlp/var/corpora/livefyre/dec29
 PLOT_INTERMEDIATE=fit_metrics
 PLOT_INTERMEDIATE2=fit_metrics2
+CURRENT_DIR=$(shell pwd)
 
 env: requirements.txt
 	test -d env || virtualenv --no-site-packages env
@@ -14,8 +15,8 @@ env: requirements.txt
 	$(PYENV) pip install matplotlib
 	$(PYENV) easy_install ipython
 
-$(PLOT_INTERMEDIATE) $(PLOT_INTERMEDIATE2): %: %.csv chart.scpt chart.html chart.js
-	osascript chart.scpt 'file://'`pwd`'/chart.html#'$<
+$(PLOT_INTERMEDIATE) $(PLOT_INTERMEDIATE2): %: %.csv chart/chart.scpt chart/chart.html chart/chart.js
+	osascript chart/chart.scpt "file://"$(shell pwd)"/chart/chart.html#../$<"
 
 plot_py: $(PLOT_INTERMEDIATE).png
 	open -a "Preview" $^
