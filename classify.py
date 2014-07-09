@@ -153,7 +153,7 @@ pca_pipeline = PCAPipeline([
 ])
 colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
-    ('coll', ChiSqBigramFinder(score_thr=100)),
+    ('coll', ChiSqBigramFinder(score_thr=70)),
     ('vectc', FeatureHasher(input_type="string", non_negative=True))
 ])
 #lang_pipeline = FeaturePipeline([
@@ -206,9 +206,10 @@ if opts.select_chi2:
     ch2 = SelectKBest(chi2, k=opts.select_chi2)
     X_train = ch2.fit_transform(X_train, y_train)
     X_test = ch2.transform(X_test)
-    feature_names = ch2.transform(feature_names)[0]
     print("done in %fs" % (time() - t0))
     print()
+    if feature_names:
+        feature_names = ch2.transform(feature_names)[0]
 
 
 ###############################################################################
