@@ -33,9 +33,8 @@ from sklearn.pipeline import FeatureUnion
 from sklearn.decomposition import TruncatedSVD
 # from sklearn.preprocessing import StandardScaler, Normalizer
 
-from lfcorpus_utils import get_data_frames
-from lfcorpus_utils import get_data_frame
-from lf_feat_extract import with_l1_feature_selection, TextExtractor, \
+from utils.lfcorpus import get_data_frame, get_data_frames
+from utils.feature_extract import with_l1_feature_selection, TextExtractor, \
     FeatureLang, LengthVectorizer, FeaturePipeline, PCAPipeline, \
     ChiSqBigramFinder
 

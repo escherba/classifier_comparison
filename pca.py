@@ -7,7 +7,7 @@ import pylab as pl
 
 from argparse import ArgumentParser
 from time import time
-from lfcorpus_utils import get_data_frame
+from utils.lfcorpus import get_data_frame
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction.text import HashingVectorizer

@@ -22,7 +22,7 @@ plot_py: $(PLOT_INTERMEDIATE).png
 
 pca: pca.py
 	$(PYTHON) $< \
-		--method NMF \
+		--method SVD \
 		--vectorizer tfidf \
 		--data_dir $(CORPUS_DIR)
 
@@ -38,14 +38,14 @@ extract_topics: topic_extraction.py
 $(PLOT_INTERMEDIATE).png: plot.py $(PLOT_INTERMEDIATE).csv
 	$(PYTHON) $^ $@
 
-$(PLOT_INTERMEDIATE).csv: classify.py lf_feat_extract.py lfcorpus_utils.py
+$(PLOT_INTERMEDIATE).csv: classify.py utils/feature_extract.py utils/lfcorpus.py
 	$(PYTHON) $< \
 		--vectorizer hashing \
 		--top_terms 100 \
 		--data_dir $(CORPUS_DIR) \
 		--output $@
 
-$(PLOT_INTERMEDIATE2).csv: classify.py lf_feat_extract.py lfcorpus_utils.py
+$(PLOT_INTERMEDIATE2).csv: classify.py utils/feature_extract.py utils/lfcorpus.py
 	python $< \
 		--top_terms 100 \
 		--vectorizer hashing \
