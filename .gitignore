@@ -64,5 +64,8 @@ docs/_build/
 .domino/
 results/
 
+# Another results dir
+out/
+
 # Data
 corpora/
