@@ -63,6 +63,8 @@ docs/_build/
 # Domino
 .domino/
 results/
+.container
 
 # Data
 corpora/
+
