@@ -8,13 +8,17 @@ op.add_argument('--n_shards', type=int, default=1,
                 help='number of shards whose results we are combining')
 op.add_argument('--use_domino', type=int, default=1,
                 help="whether to use domino or run locally")
-op.add_argument('--output_basename', type=str, default='Latest',
+op.add_argument('--output_basename', type=str, default='results/Latest',
                 help="basename of file containing json dict output for combining")
 op.add_argument('--scoring', type=str, default='f1',
                 help="scoring method")
 op.add_argument('--data_dir', type=str, default='corpora/livefyre',
                 help="data directory")
 args = op.parse_args()
+
+d = os.path.dirname(args.output_basename)
+if not os.path.isdir(d):
+    os.makedirs(d)
 
 for i in range(args.n_shards):
     # we have to wait for each domino submission to complete before starting the
@@ -29,4 +33,5 @@ for i in range(args.n_shards):
         --output_basename %s
     """ % (prefix, args.scoring, args.data_dir, i, args.n_shards, args.output_basename)
     cmd = cmd.replace('\n', '')
+    print '>>>', cmd
     os.system(cmd)

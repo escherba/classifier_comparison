@@ -4,7 +4,7 @@ from argparse import ArgumentParser
 import json
 
 op = ArgumentParser()
-op.add_argument('--basename', type=str, default='Untitled',
+op.add_argument('--basename', type=str, default='results/Latest',
                 help='base name of the files containing shard results')
 op.add_argument('--n_shards', type=int, default=1,
                 help='number of shards whose results we are combining')
