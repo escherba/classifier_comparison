@@ -9,7 +9,7 @@ import json
 
 from time import time
 from sklearn.feature_extraction import text
-from lfcorpus_utils import get_data_frame
+from utils.lfcorpus import get_data_frame
 
 # parse commandline arguments
 op = ArgumentParser()
