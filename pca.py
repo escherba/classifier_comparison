@@ -4,13 +4,14 @@ import json
 import logging
 import numpy as np
 import pylab as pl
-
 from argparse import ArgumentParser
 from time import time
-from lfcorpus_utils import get_data_frame
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.feature_extraction.text import HashingVectorizer
+from sklearn.pipeline import FeatureUnion
+from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
+
+from utils.lfcorpus import get_data_frame
+from utils.feature_extract import TextExtractor, FeaturePipeline
 
 
 # Display progress logs on stdout
@@ -40,53 +41,62 @@ else:
     op.error("Invalid decomposition method")
 
 
-data_train = get_data_frame(
+data = get_data_frame(
     args.data_dir,
-    lambda line: json.loads(line)['content'])
+    lambda line: json.loads(line))
 
 # split a training set and a test set
-y_train = data_train.target
+y = data.target
 
 print("Extracting features from the training dataset "
       "using a sparse vectorizer")
-t0 = time()
 if args.vectorizer == "hashing":
     vectorizer = HashingVectorizer(stop_words='english', non_negative=True,
                                    n_features=args.n_features)
-    X_train = vectorizer.transform(data_train.data)
-    # mapping from integer feature name to original token string
-    feature_names = None
 elif args.vectorizer == "tfidf":
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                                  stop_words='english')
-    X_train = vectorizer.fit_transform(data_train.data)
-    duration = time() - t0
-    print("n_samples: %d, n_features: %d" % X_train.shape)
-    print()
-    # mapping from integer feature name to original token string
-    feature_names = np.asarray(vectorizer.get_feature_names())
+
+content_pipeline = FeaturePipeline([
+    ('cont1', TextExtractor('content')),
+    ('vec', vectorizer),
+])
+preprocess = FeatureUnion([
+    ('cp', content_pipeline),
+    # feature pipeline of your choice
+])
+
+# Fit to data
+t0 = time()
+if args.vectorizer == "hashing":
+    X = preprocess.transform(data.data)
+elif args.vectorizer == "tfidf":
+    X = preprocess.fit_transform(data.data)
+duration = time() - t0
+print("n_samples: %d, n_features: %d" % X.shape)
+print()
 
 
 # Perform PCA
 pca = Decomposition(n_components=2)
-ox = pca.fit_transform(X_train, y_train)
+ox = pca.fit_transform(X, y)
 
 # Plot results split by classes
-data_length = y_train.shape[0]
-neg_y_train = np.array([1 ** data_length]) - y_train
+data_length = y.shape[0]
+neg_y = np.array([1 ** data_length]) - y
 
 component0 = ox[:, 0]
 component1 = ox[:, 1]
 
-positives0 = component0[y_train.nonzero()]
-positives1 = component1[y_train.nonzero()]
-negatives0 = component0[neg_y_train.nonzero()]
-negatives1 = component1[neg_y_train.nonzero()]
+positives0 = component0[y.nonzero()]
+positives1 = component1[y.nonzero()]
+negatives0 = component0[neg_y.nonzero()]
+negatives1 = component1[neg_y.nonzero()]
 
 pl.plot(positives0, positives1, 'r+')
 pl.plot(negatives0, negatives1, 'b+')
 
-categories = list(data_train['target_names'])
+categories = list(data['target_names'])
 categories.reverse()
 pl.legend(categories)
 pl.show()

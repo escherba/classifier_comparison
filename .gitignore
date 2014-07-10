@@ -65,6 +65,9 @@ docs/_build/
 results/
 .container
 
+# Another results dir
+out/
+
 # Data
 corpora/
 

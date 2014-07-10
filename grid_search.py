@@ -21,11 +21,9 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.preprocessing import Normalizer
 
-# from lf_feat_extract import LemmaTokenizer
-
-from lfcorpus_utils import get_data_frame
-from lf_feat_extract import TextExtractor, \
-    FeatureLang, LengthVectorizer, FeaturePipeline
+from utils.lfcorpus import get_data_frame
+from utils.feature_extract import TextExtractor, FeatureLang, \
+    LengthVectorizer, FeaturePipeline
 
 import nltk
 nltk.data.path.append('./corpora/nltk_data/')

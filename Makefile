@@ -7,6 +7,7 @@ CORPUS_DIR2=~/dev/py-nlp/var/corpora/livefyre/dec17
 CORPUS_DIR3=~/dev/py-nlp/var/corpora/livefyre/dec29
 PLOT_INTERMEDIATE=fit_metrics
 PLOT_INTERMEDIATE2=fit_metrics2
+OUTPUT=out
 
 env: requirements.txt
 	test -d env || virtualenv --no-site-packages env
@@ -14,15 +15,15 @@ env: requirements.txt
 	$(PYENV) pip install matplotlib
 	$(PYENV) easy_install ipython
 
-$(PLOT_INTERMEDIATE) $(PLOT_INTERMEDIATE2): %: %.html %.csv chart.js
-	open -a "Safari" $<
+$(PLOT_INTERMEDIATE) $(PLOT_INTERMEDIATE2): %: $(OUTPUT)/%.csv chart/chart.scpt chart/chart.html chart/chart.js
+	osascript chart/chart.scpt "file://"$(CURDIR)"/chart/chart.html#.."/$<
 
-plot_py: $(PLOT_INTERMEDIATE).png
+plot_py: $(OUTPUT)/$(PLOT_INTERMEDIATE).png
 	open -a "Preview" $^
 
 pca: pca.py
 	$(PYTHON) $< \
-		--method NMF \
+		--method SVD \
 		--vectorizer tfidf \
 		--data_dir $(CORPUS_DIR)
 
@@ -35,23 +36,26 @@ extract_topics: topic_extraction.py
 		--n_features 4000 \
 		--categories spam
 
-$(PLOT_INTERMEDIATE).png: plot.py $(PLOT_INTERMEDIATE).csv
+$(OUTPUT)/$(PLOT_INTERMEDIATE).png: plot.py $(OUTPUT)/$(PLOT_INTERMEDIATE).csv
 	$(PYTHON) $^ $@
 
-$(PLOT_INTERMEDIATE).csv: classify.py lf_feat_extract.py lfcorpus_utils.py
+$(OUTPUT)/$(PLOT_INTERMEDIATE).csv: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	$(PYTHON) $< \
 		--vectorizer hashing \
 		--top_terms 100 \
 		--data_dir $(CORPUS_DIR) \
 		--output $@
 
-$(PLOT_INTERMEDIATE2).csv: classify.py lf_feat_extract.py lfcorpus_utils.py
+$(OUTPUT)/$(PLOT_INTERMEDIATE2).csv: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	python $< \
 		--top_terms 100 \
 		--vectorizer hashing \
 		--data_test $(CORPUS_DIR3) \
 		--data_train $(CORPUS_DIR2) \
 		--output $@
+
+$(OUTPUT):
+	mkdir $(OUTPUT)
 
 grid_search: grid_search.py
 	$(PYTHON) $< \
@@ -60,5 +64,4 @@ grid_search: grid_search.py
 
 clean:
 	find . -type f -name "*.pyc" -exec rm -f {} \;
-	rm -f $(PLOT_INTERMEDIATE).csv $(PLOT_INTERMEDIATE).png
-	rm -f $(PLOT_INTERMEDIATE2).csv $(PLOT_INTERMEDIATE2).png
+	rm -f $(OUTPUT)/*
