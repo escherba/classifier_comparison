@@ -152,8 +152,9 @@ pca_pipeline = PCAPipeline([
 ])
 colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
-    ('coll', ChiSqBigramFinder(score_thr=70)),
-    ('vectc', FeatureHasher(input_type="string", non_negative=True))
+    ('coll', ChiSqBigramFinder(score_thr=50)),
+    ('vectc', DictVectorizer())
+    #('vectc', FeatureHasher(input_type="string", non_negative=True))
 ])
 #lang_pipeline = FeaturePipeline([
 #    ('cont3', TextExtractor('content')),

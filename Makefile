@@ -41,7 +41,7 @@ $(OUTPUT)/$(PLOT_INTERMEDIATE).png: plot.py $(OUTPUT)/$(PLOT_INTERMEDIATE).csv
 
 $(OUTPUT)/$(PLOT_INTERMEDIATE).csv: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	$(PYTHON) $< \
-		--vectorizer hashing \
+		--vectorizer tfidf \
 		--top_terms 100 \
 		--data_dir $(CORPUS_DIR) \
 		--output $@
@@ -49,7 +49,7 @@ $(OUTPUT)/$(PLOT_INTERMEDIATE).csv: classify.py utils/feature_extract.py utils/l
 $(OUTPUT)/$(PLOT_INTERMEDIATE2).csv: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	python $< \
 		--top_terms 100 \
-		--vectorizer hashing \
+		--vectorizer tfidf \
 		--data_test $(CORPUS_DIR3) \
 		--data_train $(CORPUS_DIR2) \
 		--output $@

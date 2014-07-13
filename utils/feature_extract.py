@@ -1,23 +1,45 @@
 import logging
 import numpy as np
 
-from nltk import word_tokenize
+from HTMLParser import HTMLParser
 from nltk.stem import WordNetLemmatizer
 from langid import classify as langid_classify
 from sklearn import base, metrics
 from sklearn.pipeline import Pipeline
 from nltk.collocations import BigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures
+from nltk.tokenize.treebank import TreebankWordTokenizer
 
 logger = logging.getLogger(__name__)
 
 
-class LemmaTokenizer(object):
+class MLStripper(HTMLParser):
     def __init__(self):
+        self.reset()
+        self.fed = []
+
+    def handle_data(self, d):
+        self.fed.append(d)
+
+    def get_data(self):
+        return ''.join(self.fed)
+
+
+def clean_html(html):
+    """Remove HTML markup from the given string."""
+    s = MLStripper()
+    s.feed(html)
+    return s.get_data().strip()
+
+
+class LemmaTokenizer(object):
+    def __init__(self, tokenizer=None):
         self.wnl = WordNetLemmatizer()
+        self.tokenizer = TreebankWordTokenizer \
+            if tokenizer is None else tokenizer
 
     def __call__(self, doc):
-        return [self.wnl.lemmatize(t) for t in word_tokenize(doc)]
+        return [self.wnl.lemmatize(t) for t in self.tokenizer.tokenize(doc)]
 
 
 def with_l1_feature_selection(class_T, **kwargs):
@@ -59,19 +81,30 @@ class FeatureLang(base.BaseEstimator,
 class ChiSqBigramFinder(base.BaseEstimator,
                         base.TransformerMixin):
 
-    def __init__(self, score_thr=50):
+    def __init__(self, tokenizer=None, score_thr=50):
         self.score_thr = score_thr
+        self.tokenizer = TreebankWordTokenizer() \
+            if tokenizer is None else tokenizer
 
     def fit(self, X, y=None):
         return self
+
+    @staticmethod
+    def punct_filter_(w):
+        """
+        Match separating punctuation (commas, periods, but not colons, hyphens)
+        """
+        return w in {'.', ',', ';'}
 
     def transform(self, X, y=None):
         result = []
         scorer = (BigramAssocMeasures.chi_sq, self.score_thr)
         for x in X:
-            g_finder = BigramCollocationFinder.from_words(x)
+            words = self.tokenizer.tokenize(x)
+            g_finder = BigramCollocationFinder.from_words(words)
+            g_finder.apply_word_filter(self.punct_filter_)
             bigrams = g_finder.above_score(*scorer)
-            processed = (repr(b) for b in bigrams)
+            processed = {"%s:%s" % b: True for b in bigrams}
             result.append(processed)
         return result
 
@@ -79,19 +112,21 @@ class ChiSqBigramFinder(base.BaseEstimator,
 class TextExtractor(base.BaseEstimator,
                     base.TransformerMixin):
 
-    def __init__(self, column, lowercase=False):
+    def __init__(self, column):
         self.column = column
-        self.lowercase = lowercase
+        self.html_parser = HTMLParser()
 
     def fit(self, X, y=None):
         return self
 
+    def clean_(self, soup):
+        unescaped_soup = self.html_parser.unescape(soup)
+        text = clean_html(unescaped_soup)
+        return text.lower()
+
     def transform(self, X, y=None):
         column = self.column
-        if self.lowercase:
-            result = [row[column].lower() for row in X]
-        else:
-            result = [row[column] for row in X]
+        result = [self.clean_(row[column]) for row in X]
         return np.asarray(result,  dtype=np.unicode)
 
     def get_feature_names(self):
