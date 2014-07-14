@@ -28,7 +28,8 @@ from sklearn.svm import LinearSVC
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB
 from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
 from sklearn.utils.extmath import density
-from sklearn import metrics
+from sklearn.metrics import roc_curve, auc, f1_score, classification_report, \
+    confusion_matrix
 from sklearn.pipeline import FeatureUnion
 from sklearn.decomposition import TruncatedSVD
 # from sklearn.preprocessing import StandardScaler, Normalizer
@@ -151,7 +152,7 @@ pca_pipeline = PCAPipeline([
 ])
 colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
-    ('coll', ChiSqBigramFinder(score_thr=50)),
+    ('coll', ChiSqBigramFinder(score_thr=80)),
     ('vectc', DictVectorizer())
 ])
 #lang_pipeline = FeaturePipeline([
@@ -165,7 +166,7 @@ colloc_pipeline = FeaturePipeline([
 #])
 preprocess = FeatureUnion([
     ('cp', content_pipeline),
-    ('op', colloc_pipeline),
+    #('op', colloc_pipeline),
     #('lp', lang_pipeline),
     # ('mp', len_pipeline)
 ])
@@ -238,8 +239,32 @@ def benchmark(clf, clf_descr=None):
     test_time = time() - t0
     print("test time:  %0.3fs" % test_time)
 
-    score = metrics.f1_score(y_test, pred)
+    # Get F1 score
+    score = f1_score(y_test, pred)
     print("f1-score:   %0.3f" % score)
+
+    # Get ROC curve
+    predict_proba = getattr(clf, "predict_proba", None)
+    decision_function = getattr(clf, "decision_function", None)
+    e = None
+    if callable(predict_proba):
+        try:
+            probas_ = predict_proba(X_test)
+        except ValueError as e:
+            logger.error(e)
+        if e is None:
+            fpr, tpr, thresholds = roc_curve(y_test, probas_[:, 1])
+            roc_auc = auc(fpr, tpr)
+            print("ROC area = %0.3f" % roc_auc)
+    elif callable(decision_function):
+        try:
+            scores_ = decision_function(X_test)
+        except ValueError as e:
+            logger.error(e)
+        if e is None:
+            fpr, tpr, thresholds = roc_curve(y_test, scores_)
+            roc_auc = auc(fpr, tpr)
+            print("ROC area = %0.3f" % roc_auc)
 
     if hasattr(clf, 'coef_'):
         print("dimensionality: %d" % clf.coef_.shape[1])
@@ -260,12 +285,11 @@ def benchmark(clf, clf_descr=None):
 
     if opts.print_report:
         print("classification report:")
-        print(metrics.classification_report(y_test, pred,
-                                            target_names=categories))
+        print(classification_report(y_test, pred, target_names=categories))
 
     if opts.print_cm:
         print("confusion matrix:")
-        print(metrics.confusion_matrix(y_test, pred))
+        print(confusion_matrix(y_test, pred))
 
     return clf_descr, score, train_time, test_time
 
@@ -321,7 +345,7 @@ for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("SGD with %s penalty" % penalty.upper())
     results.append(benchmark(
-        SGDClassifier(loss='hinge', alpha=1e-4, n_iter=50, penalty=penalty),
+        SGDClassifier(loss='log', alpha=1e-4, n_iter=50, penalty=penalty),
         "SGD (" + penalty.upper() + " penalty)"))
 
 # print('=' * 80)
@@ -335,7 +359,7 @@ print('=' * 80)
 print("SGD L1 feature selection")
 clf = with_l1_feature_selection(
     SGDClassifier, loss='log', alpha=0.00021, n_iter=10
-    )(loss='hinge', alpha=.0001, n_iter=50)
+    )(loss='log', alpha=.0001, n_iter=50)
 results.append(benchmark(clf, "SGD (L1-feature select)"))
 
 
