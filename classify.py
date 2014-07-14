@@ -19,7 +19,7 @@ import numpy as np
 
 from sklearn.feature_extraction.text import TfidfVectorizer, \
     HashingVectorizer
-from sklearn.feature_extraction import DictVectorizer, FeatureHasher
+from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.linear_model import RidgeClassifier, SGDClassifier, \
     LogisticRegression, Perceptron, PassiveAggressiveClassifier
@@ -35,8 +35,7 @@ from sklearn.decomposition import TruncatedSVD
 
 from utils.lfcorpus import get_data_frame, get_data_frames
 from utils.feature_extract import with_l1_feature_selection, TextExtractor, \
-    FeatureLang, LengthVectorizer, FeaturePipeline, PCAPipeline, \
-    ChiSqBigramFinder
+    FeaturePipeline, PCAPipeline, ChiSqBigramFinder
 
 # Display progress logs on stdout
 logging.basicConfig(level=logging.INFO,
@@ -154,7 +153,6 @@ colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
     ('coll', ChiSqBigramFinder(score_thr=50)),
     ('vectc', DictVectorizer())
-    #('vectc', FeatureHasher(input_type="string", non_negative=True))
 ])
 #lang_pipeline = FeaturePipeline([
 #    ('cont3', TextExtractor('content')),

@@ -115,6 +115,20 @@ class TextExtractor(base.BaseEstimator,
     def __init__(self, column):
         self.column = column
         self.html_parser = HTMLParser()
+        self.normalize_map = {k: None for k in (
+            range(ord(u'\x00'), ord(u'\x08') + 1) +
+            range(ord(u'\x0b'), ord(u'\x0c') + 1) +
+            range(ord(u'\x0e'), ord(u'\x1f') + 1) +
+            range(ord(u'\x7f'), ord(u'\x9f') + 1) +
+            [ord(u'\uffff')] +
+            [ord(u'\xad')] +
+            range(ord(u'\u17b4'), ord(u'\u17b5') + 1) +
+            range(ord(u'\u200b'), ord(u'\u200f') + 1) +
+            range(ord(u'\u202a'), ord(u'\u202d') + 1) +
+            range(ord(u'\u2060'), ord(u'\u2064') + 1) +
+            range(ord(u'\u206a'), ord(u'\u206f') + 1) +
+            [ord(u'\ufeff')]
+        )}
 
     def fit(self, X, y=None):
         return self
@@ -122,7 +136,7 @@ class TextExtractor(base.BaseEstimator,
     def clean_(self, soup):
         unescaped_soup = self.html_parser.unescape(soup)
         text = clean_html(unescaped_soup)
-        return text.lower()
+        return text.translate(self.normalize_map).lower()
 
     def transform(self, X, y=None):
         column = self.column
