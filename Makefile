@@ -48,8 +48,8 @@ $(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: classi
 		--output_roc $(basename $@).roc \
 		--output     $(basename $@).scores
 
- $(OUTPUT)/$(PLOT_INTERMEDIATE2).roc $(OUTPUT)/$(PLOT_INTERMEDIATE2).scores: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
-	python $< \
+$(OUTPUT)/$(PLOT_INTERMEDIATE2).roc $(OUTPUT)/$(PLOT_INTERMEDIATE2).scores: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
+	$(PYTHON) $< \
 		--top_terms 100 \
 		--vectorizer tfidf \
 		--data_test $(CORPUS_DIR3) \

@@ -164,8 +164,8 @@ colloc_pipeline = FeaturePipeline([
 #    ('len', LengthVectorizer())
 #])
 preprocess = FeatureUnion([
-    ('bow', content_pipeline),
-    #('big', colloc_pipeline),
+    ('w', content_pipeline),
+    ('bi', colloc_pipeline),
     #('lp', lang_pipeline),
     # ('mp', len_pipeline)
 ])

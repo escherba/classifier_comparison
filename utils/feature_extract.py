@@ -1,4 +1,5 @@
 import logging
+import re
 import numpy as np
 
 from HTMLParser import HTMLParser
@@ -27,6 +28,10 @@ class MLStripper(HTMLParser):
 
 def clean_html(html):
     """Remove HTML markup from the given string."""
+    html = re.sub(r"(?s)<!--(.*?)-->[\n]?", "\\1", html)
+    html = re.sub(r"<!--", "", html)
+    if html == '':
+        return ''
     s = MLStripper()
     s.feed(html)
     return s.get_data().strip()
@@ -136,7 +141,8 @@ class TextExtractor(base.BaseEstimator,
     def clean_(self, soup):
         unescaped_soup = self.html_parser.unescape(soup)
         text = clean_html(unescaped_soup)
-        return text.translate(self.normalize_map).lower()
+        cleaned = text.translate(self.normalize_map).lower()
+        return cleaned
 
     def transform(self, X, y=None):
         column = self.column
