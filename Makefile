@@ -21,6 +21,9 @@ $(PLOT_INTERMEDIATE) $(PLOT_INTERMEDIATE2): %: $(OUTPUT)/%.scores chart/chart.sc
 plot_py: $(OUTPUT)/$(PLOT_INTERMEDIATE).scores.png $(OUTPUT)/$(PLOT_INTERMEDIATE).roc.png
 	open -a "Preview" $^
 
+plot_py2: $(OUTPUT)/$(PLOT_INTERMEDIATE2).scores.png $(OUTPUT)/$(PLOT_INTERMEDIATE2).roc.png
+	open -a "Preview" $^
+
 pca: pca.py
 	$(PYTHON) $< \
 		--method SVD \
@@ -36,10 +39,10 @@ extract_topics: topic_extraction.py
 		--n_features 4000 \
 		--categories spam
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE).scores.png: plot_scores.py $(OUTPUT)/$(PLOT_INTERMEDIATE).scores
+%.roc.png: plot_roc.py %.roc
 	$(PYTHON) $^ $@
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE).roc.png: plot_roc.py $(OUTPUT)/$(PLOT_INTERMEDIATE).roc
+%.scores.png: plot_scores.py %.scores
 	$(PYTHON) $^ $@
 
 $(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
