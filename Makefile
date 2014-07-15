@@ -18,7 +18,7 @@ env: requirements.txt
 $(PLOT_INTERMEDIATE) $(PLOT_INTERMEDIATE2): %: $(OUTPUT)/%.scores chart/chart.scpt chart/chart.html chart/chart.js
 	osascript chart/chart.scpt "file://"$(CURDIR)"/chart/chart.html#.."/$<
 
-plot_py: $(OUTPUT)/$(PLOT_INTERMEDIATE).png
+plot_py: $(OUTPUT)/$(PLOT_INTERMEDIATE).scores.png $(OUTPUT)/$(PLOT_INTERMEDIATE).roc.png
 	open -a "Preview" $^
 
 pca: pca.py
@@ -36,9 +36,11 @@ extract_topics: topic_extraction.py
 		--n_features 4000 \
 		--categories spam
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE).png: plot_scores.py $(OUTPUT)/$(PLOT_INTERMEDIATE).scores
+$(OUTPUT)/$(PLOT_INTERMEDIATE).scores.png: plot_scores.py $(OUTPUT)/$(PLOT_INTERMEDIATE).scores
 	$(PYTHON) $^ $@
 
+$(OUTPUT)/$(PLOT_INTERMEDIATE).roc.png: plot_roc.py $(OUTPUT)/$(PLOT_INTERMEDIATE).roc
+	$(PYTHON) $^ $@
 
 $(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	$(PYTHON) $< \
