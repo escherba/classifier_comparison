@@ -1,4 +1,4 @@
-.PHONY: pca plot plot_py clean extract_topics env
+.PHONY: pca plot_py clean extract_topics env
 
 PYENV = . env/bin/activate;
 PYTHON = . env/bin/activate; python
@@ -36,7 +36,7 @@ extract_topics: topic_extraction.py
 		--n_features 4000 \
 		--categories spam
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE).png: plot.py $(OUTPUT)/$(PLOT_INTERMEDIATE).scores
+$(OUTPUT)/$(PLOT_INTERMEDIATE).png: plot_scores.py $(OUTPUT)/$(PLOT_INTERMEDIATE).scores
 	$(PYTHON) $^ $@
 
 
