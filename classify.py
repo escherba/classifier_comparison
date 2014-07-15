@@ -8,12 +8,11 @@
 from __future__ import print_function
 
 import logging
-import csv
 import json
 import sys
 
 from time import time
-from argparse import ArgumentParser
+from argparse import ArgumentParser, FileType
 
 import numpy as np
 
@@ -34,6 +33,7 @@ from sklearn.pipeline import FeatureUnion
 from sklearn.decomposition import TruncatedSVD
 # from sklearn.preprocessing import StandardScaler, Normalizer
 
+from utils import to_csv
 from utils.lfcorpus import get_data_frame, get_data_frames
 from utils.feature_extract import with_l1_feature_selection, TextExtractor, \
     FeaturePipeline, PCAPipeline, ChiSqBigramFinder
@@ -68,9 +68,8 @@ op.add_argument("--data_train", type=str,
                 help="data directory")
 op.add_argument("--data_test", type=str,
                 help="data directory")
-op.add_argument("--output", type=str,
-                help="output path", required=True)
-
+op.add_argument("--output", type=FileType('w'), help="output path")
+op.add_argument("--output_roc", type=FileType('w'),  help="output path (ROC)")
 
 opts = op.parse_args()
 
@@ -165,8 +164,8 @@ colloc_pipeline = FeaturePipeline([
 #    ('len', LengthVectorizer())
 #])
 preprocess = FeatureUnion([
-    ('cp', content_pipeline),
-    #('op', colloc_pipeline),
+    ('bow', content_pipeline),
+    #('big', colloc_pipeline),
     #('lp', lang_pipeline),
     # ('mp', len_pipeline)
 ])
@@ -213,6 +212,10 @@ if opts.select_chi2:
 
 ###############################################################################
 # Benchmark classifiers
+
+all_roc_data = []
+
+
 def benchmark(clf, clf_descr=None):
     print('_' * 80)
 
@@ -247,24 +250,20 @@ def benchmark(clf, clf_descr=None):
     predict_proba = getattr(clf, "predict_proba", None)
     decision_function = getattr(clf, "decision_function", None)
     e = None
-    if callable(predict_proba):
-        try:
-            probas_ = predict_proba(X_test)
-        except ValueError as e:
-            logger.error(e)
-        if e is None:
-            fpr, tpr, thresholds = roc_curve(y_test, probas_[:, 1])
-            roc_auc = auc(fpr, tpr)
-            print("ROC area = %0.3f" % roc_auc)
-    elif callable(decision_function):
-        try:
-            scores_ = decision_function(X_test)
-        except ValueError as e:
-            logger.error(e)
-        if e is None:
-            fpr, tpr, thresholds = roc_curve(y_test, scores_)
-            roc_auc = auc(fpr, tpr)
-            print("ROC area = %0.3f" % roc_auc)
+    probas_ = None
+    try:
+        if callable(predict_proba):
+            probas_ = predict_proba(X_test)[:, 1]
+        elif callable(decision_function):
+            probas_ = decision_function(X_test)  # LinearSVC
+    except ValueError as e:
+        logger.error(e)
+    if probas_ is not None and e is None:
+        fpr, tpr, thresholds = roc_curve(y_test, probas_)
+        roc_auc = auc(fpr, tpr)
+        labels = [clf_descr] * len(fpr)
+        all_roc_data.extend(zip(labels, fpr, tpr))
+        print("ROC area = %0.3f" % roc_auc)
 
     if hasattr(clf, 'coef_'):
         print("dimensionality: %d" % clf.coef_.shape[1])
@@ -291,10 +290,11 @@ def benchmark(clf, clf_descr=None):
         print("confusion matrix:")
         print(confusion_matrix(y_test, pred))
 
-    return clf_descr, score, train_time, test_time
+    return [clf_descr, score, train_time, test_time]
 
 
 results = [["Classifier", "Score", "Train.Time", "Test.Time"]]
+
 for clf in (
     RidgeClassifier(alpha=8.0, solver="sparse_cg"),
     Perceptron(n_iter=50, alpha=1.0),
@@ -368,7 +368,10 @@ results.append(benchmark(clf, "SGD (L1-feature select)"))
 # results.append(benchmark(SVC(kernel='rbf')))
 
 
-with open(opts.output, 'wb') as csvfile:
-    writer = csv.writer(csvfile, delimiter=",",
-                        quotechar='"', quoting=csv.QUOTE_NONNUMERIC)
-    writer.writerows(results)
+if opts.output_roc:
+    print("Writing ROC curve data")
+    to_csv(opts.output_roc, all_roc_data)
+
+if opts.output:
+    print("Writing scores data")
+    to_csv(opts.output, results)
