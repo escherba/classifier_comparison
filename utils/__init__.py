@@ -2,6 +2,7 @@ import csv
 
 
 def to_csv(fname, data):
-    writer = csv.writer(fname, delimiter=',', quotechar='"',
-                        quoting=csv.QUOTE_NONNUMERIC)
-    writer.writerows(data)
+    with open(fname, 'w') as csvfile:
+        writer = csv.writer(csvfile, delimiter=',', quotechar='"',
+                            quoting=csv.QUOTE_NONNUMERIC)
+        writer.writerows(data)

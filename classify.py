@@ -12,7 +12,7 @@ import json
 import sys
 
 from time import time
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser
 
 import numpy as np
 
@@ -68,8 +68,8 @@ op.add_argument("--data_train", type=str,
                 help="data directory")
 op.add_argument("--data_test", type=str,
                 help="data directory")
-op.add_argument("--output", type=FileType('w'), help="output path")
-op.add_argument("--output_roc", type=FileType('w'),  help="output path (ROC)")
+op.add_argument("--output", type=str, help="output path")
+op.add_argument("--output_roc", type=str,  help="output path (ROC)")
 
 opts = op.parse_args()
 

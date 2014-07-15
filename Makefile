@@ -1,13 +1,12 @@
 .PHONY: pca clean extract_topics env
-
 PYENV = . env/bin/activate;
 PYTHON = . env/bin/activate; python
 CORPUS_DIR=~/dev/py-nlp/var/corpora/livefyre
 CORPUS_DIR2=~/dev/py-nlp/var/corpora/livefyre/dec17
 CORPUS_DIR3=~/dev/py-nlp/var/corpora/livefyre/dec29
-PLOT_INTERMEDIATE=fit_metrics
-PLOT_INTERMEDIATE2=fit_metrics_time
 OUTPUT=out
+PLOT_INTERMEDIATE=$(OUTPUT)/fit_metrics
+PLOT_INTERMEDIATE2=$(OUTPUT)/fit_metrics_time
 
 env: requirements.txt
 	test -d env || virtualenv --no-site-packages env
@@ -21,10 +20,10 @@ plot_browser_time: $(PLOT_INTERMEDIATE2).browser
 plot_pylab: $(PLOT_INTERMEDIATE).pylab
 plot_pylab_time: $(PLOT_INTERMEDIATE2).pylab
 
-%.browser: $(OUTPUT)/%.scores chart/chart.scpt chart/chart.html chart/chart.js
+%.browser: %.scores chart/chart.scpt chart/chart.html chart/chart.js
 	osascript chart/chart.scpt "file://"$(CURDIR)"/chart/chart.html#.."/$<
 
-%.pylab: $(OUTPUT)/%.scores.png $(OUTPUT)/%.roc.png
+%.pylab: %.scores.png %.roc.png
 	open -a "Preview" $^
 
 pca: pca.py
@@ -42,13 +41,16 @@ extract_topics: topic_extraction.py
 		--n_features 4000 \
 		--categories spam
 
+.PRECIOUS: $(PLOT_INTERMEDIATE).roc.png $(PLOT_INTERMEDIATE2).roc.png
 %.roc.png: plot_roc.py %.roc
 	$(PYTHON) $^ $@
 
+.PRECIOUS: $(PLOT_INTERMEDIATE).scores.png $(PLOT_INTERMEDIATE2).scores.png
 %.scores.png: plot_scores.py %.scores
 	$(PYTHON) $^ $@
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
+.PRECIOUS: $(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores
+$(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	$(PYTHON) $< \
 		--vectorizer tfidf \
 		--top_terms 100 \
@@ -56,7 +58,8 @@ $(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: %: cla
 		--output_roc $(basename $@).roc \
 		--output     $(basename $@).scores
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE2).roc $(OUTPUT)/$(PLOT_INTERMEDIATE2).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
+.PRECIOUS: $(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores
+$(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	$(PYTHON) $< \
 		--top_terms 100 \
 		--vectorizer tfidf \
