@@ -7,8 +7,11 @@ df.columns = ['label', 'fpr', 'tpr']
 
 plt.figure()
 for i, group in df.groupby(df.columns[0]):
-    group.plot(x=df.columns[1], y=df.columns[2], title="ROC Curve",
-               subplots=True)
+    group.plot(x=df.columns[1], y=df.columns[2], label=str(i),
+               title="ROC Curve", subplots=True)
+
+plt.legend(loc='best')
+plt.xlim([0.0, 0.3])
 
 if len(sys.argv) <= 2:
     plt.show()
