@@ -1,4 +1,4 @@
-.PHONY: pca clean extract_topics env
+.PHONY: pca clean extract_topics env plot_py plot_py2
 
 PYENV = . env/bin/activate;
 PYTHON = . env/bin/activate; python
@@ -15,13 +15,16 @@ env: requirements.txt
 	$(PYENV) pip install matplotlib
 	$(PYENV) easy_install ipython
 
-$(PLOT_INTERMEDIATE) $(PLOT_INTERMEDIATE2): %: $(OUTPUT)/%.scores chart/chart.scpt chart/chart.html chart/chart.js
+plot_browser: $(PLOT_INTERMEDIATE).browser
+plot_browser_time: $(PLOT_INTERMEDIATE2).browser
+
+plot_pylab: $(PLOT_INTERMEDIATE).pylab
+plot_pylab_time: $(PLOT_INTERMEDIATE2).pylab
+
+%.browser: $(OUTPUT)/%.scores chart/chart.scpt chart/chart.html chart/chart.js
 	osascript chart/chart.scpt "file://"$(CURDIR)"/chart/chart.html#.."/$<
 
-plot_py: $(OUTPUT)/$(PLOT_INTERMEDIATE).scores.png $(OUTPUT)/$(PLOT_INTERMEDIATE).roc.png
-	open -a "Preview" $^
-
-plot_py2: $(OUTPUT)/$(PLOT_INTERMEDIATE2).scores.png $(OUTPUT)/$(PLOT_INTERMEDIATE2).roc.png
+%.pylab: $(OUTPUT)/%.scores.png $(OUTPUT)/%.roc.png
 	open -a "Preview" $^
 
 pca: pca.py
