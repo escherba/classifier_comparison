@@ -42,7 +42,7 @@ $(OUTPUT)/$(PLOT_INTERMEDIATE).scores.png: plot_scores.py $(OUTPUT)/$(PLOT_INTER
 $(OUTPUT)/$(PLOT_INTERMEDIATE).roc.png: plot_roc.py $(OUTPUT)/$(PLOT_INTERMEDIATE).roc
 	$(PYTHON) $^ $@
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
+$(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	$(PYTHON) $< \
 		--vectorizer tfidf \
 		--top_terms 100 \
@@ -50,7 +50,7 @@ $(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: classi
 		--output_roc $(basename $@).roc \
 		--output     $(basename $@).scores
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE2).roc $(OUTPUT)/$(PLOT_INTERMEDIATE2).scores: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
+$(OUTPUT)/$(PLOT_INTERMEDIATE2).roc $(OUTPUT)/$(PLOT_INTERMEDIATE2).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	$(PYTHON) $< \
 		--top_terms 100 \
 		--vectorizer tfidf \

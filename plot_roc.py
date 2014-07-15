@@ -15,8 +15,12 @@ for idx, (i, group) in enumerate(groups):
     group.plot(x=df.columns[1], y=df.columns[2], label=str(i),
                title="ROC Curve", color=colors[idx], subplots=True)
 
-plt.legend(loc='best')
-plt.xlim([0.0, 0.10])
+plt.legend(loc='best', fontsize=10)
+plt.ylim([0.0, 1.0])
+plt.xlim([0.0, 0.1])
+plt.xlabel('False Positive Rate', fontsize=10)
+plt.ylabel('True Positive Rate', fontsize=10)
+plt.tick_params(axis='both', which='major', labelsize=10)
 
 if len(sys.argv) <= 2:
     plt.show()
