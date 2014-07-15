@@ -40,7 +40,7 @@ $(OUTPUT)/$(PLOT_INTERMEDIATE).scores.png: plot_scores.py $(OUTPUT)/$(PLOT_INTER
 	$(PYTHON) $^ $@
 
 $(OUTPUT)/$(PLOT_INTERMEDIATE).roc.png: plot_roc.py $(OUTPUT)/$(PLOT_INTERMEDIATE).roc
-	$(PYTHON) $^
+	$(PYTHON) $^ $@
 
 $(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	$(PYTHON) $< \
