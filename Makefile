@@ -6,7 +6,7 @@ CORPUS_DIR=~/dev/py-nlp/var/corpora/livefyre
 CORPUS_DIR2=~/dev/py-nlp/var/corpora/livefyre/dec17
 CORPUS_DIR3=~/dev/py-nlp/var/corpora/livefyre/dec29
 PLOT_INTERMEDIATE=fit_metrics
-PLOT_INTERMEDIATE2=fit_metrics2
+PLOT_INTERMEDIATE2=fit_metrics_time
 OUTPUT=out
 
 env: requirements.txt
