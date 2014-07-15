@@ -1,4 +1,4 @@
-.PHONY: pca clean extract_topics env plot_py plot_py2
+.PHONY: pca clean extract_topics env
 
 PYENV = . env/bin/activate;
 PYTHON = . env/bin/activate; python
