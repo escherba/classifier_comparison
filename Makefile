@@ -1,4 +1,4 @@
-.PHONY: pca plot plot_py clean extract_topics env
+.PHONY: pca clean extract_topics env
 
 PYENV = . env/bin/activate;
 PYTHON = . env/bin/activate; python
@@ -18,7 +18,10 @@ env: requirements.txt
 $(PLOT_INTERMEDIATE) $(PLOT_INTERMEDIATE2): %: $(OUTPUT)/%.scores chart/chart.scpt chart/chart.html chart/chart.js
 	osascript chart/chart.scpt "file://"$(CURDIR)"/chart/chart.html#.."/$<
 
-plot_py: $(OUTPUT)/$(PLOT_INTERMEDIATE).png
+plot_py: $(OUTPUT)/$(PLOT_INTERMEDIATE).scores.png $(OUTPUT)/$(PLOT_INTERMEDIATE).roc.png
+	open -a "Preview" $^
+
+plot_py2: $(OUTPUT)/$(PLOT_INTERMEDIATE2).scores.png $(OUTPUT)/$(PLOT_INTERMEDIATE2).roc.png
 	open -a "Preview" $^
 
 pca: pca.py
@@ -36,11 +39,13 @@ extract_topics: topic_extraction.py
 		--n_features 4000 \
 		--categories spam
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE).png: plot.py $(OUTPUT)/$(PLOT_INTERMEDIATE).scores
+%.roc.png: plot_roc.py %.roc
 	$(PYTHON) $^ $@
 
+%.scores.png: plot_scores.py %.scores
+	$(PYTHON) $^ $@
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
+$(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	$(PYTHON) $< \
 		--vectorizer tfidf \
 		--top_terms 100 \
@@ -48,7 +53,7 @@ $(OUTPUT)/$(PLOT_INTERMEDIATE).roc $(OUTPUT)/$(PLOT_INTERMEDIATE).scores: classi
 		--output_roc $(basename $@).roc \
 		--output     $(basename $@).scores
 
-$(OUTPUT)/$(PLOT_INTERMEDIATE2).roc $(OUTPUT)/$(PLOT_INTERMEDIATE2).scores: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
+$(OUTPUT)/$(PLOT_INTERMEDIATE2).roc $(OUTPUT)/$(PLOT_INTERMEDIATE2).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
 	$(PYTHON) $< \
 		--top_terms 100 \
 		--vectorizer tfidf \

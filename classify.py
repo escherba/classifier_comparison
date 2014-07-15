@@ -151,7 +151,7 @@ pca_pipeline = PCAPipeline([
 ])
 colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor('content')),
-    ('coll', ChiSqBigramFinder(score_thr=80)),
+    ('coll', ChiSqBigramFinder(score_thr=50)),
     ('vectc', DictVectorizer())
 ])
 #lang_pipeline = FeaturePipeline([
