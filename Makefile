@@ -1,3 +1,6 @@
+.SUFFIXES:
+	MAKEFLAGS += -r
+
 .PHONY: pca clean extract_topics env
 PYENV = . env/bin/activate;
 PYTHON = . env/bin/activate; python
@@ -13,12 +16,13 @@ env: requirements.txt
 	$(PYENV) pip install -r requirements.txt
 	$(PYENV) pip install matplotlib
 	$(PYENV) easy_install ipython
+	mkdir -p $(OUTPUT)
 
-plot_browser: $(PLOT_INTERMEDIATE).browser
-plot_browser_time: $(PLOT_INTERMEDIATE2).browser
+browser.plot: $(PLOT_INTERMEDIATE).browser
+browser.plot_time: $(PLOT_INTERMEDIATE2).browser
 
-plot_pylab: $(PLOT_INTERMEDIATE).pylab
-plot_pylab_time: $(PLOT_INTERMEDIATE2).pylab
+pylab.plot: $(PLOT_INTERMEDIATE).pylab
+pylab.plot_time: $(PLOT_INTERMEDIATE2).pylab
 
 %.browser: %.scores chart/chart.scpt chart/chart.html chart/chart.js
 	osascript chart/chart.scpt "file://"$(CURDIR)"/chart/chart.html#.."/$<
@@ -50,7 +54,7 @@ extract_topics: topic_extraction.py
 	$(PYTHON) $^ $@
 
 .PRECIOUS: $(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores
-$(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
+$(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py
 	$(PYTHON) $< \
 		--vectorizer tfidf \
 		--top_terms 100 \
@@ -59,7 +63,7 @@ $(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores: %: classify.py utils/featu
 		--output     $(basename $@).scores
 
 .PRECIOUS: $(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores
-$(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py $(OUTPUT)
+$(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py
 	$(PYTHON) $< \
 		--top_terms 100 \
 		--vectorizer tfidf \
@@ -67,9 +71,6 @@ $(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores: %: classify.py utils/fea
 		--data_train $(CORPUS_DIR2) \
 		--output_roc $(basename $@).roc \
 		--output     $(basename $@).scores
-
-$(OUTPUT):
-	mkdir $(OUTPUT)
 
 grid_search: grid_search.py
 	$(PYTHON) $< \
