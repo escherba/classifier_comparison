@@ -1,6 +1,5 @@
 import logging
 import re
-import numpy as np
 
 from HTMLParser import HTMLParser
 from nltk.stem import WordNetLemmatizer
@@ -146,8 +145,8 @@ class TextExtractor(base.BaseEstimator,
 
     def transform(self, X, y=None):
         column = self.column
-        result = [self.clean_(row[column]) for row in X]
-        return np.asarray(result,  dtype=np.unicode)
+        for row in X:
+            yield self.clean_(row[column])
 
     def get_feature_names(self):
         return [self.column]
