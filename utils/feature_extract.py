@@ -21,6 +21,10 @@ class MLStripper(HTMLParser):
     def handle_data(self, d):
         self.fed.append(d)
 
+    def handle_entityref(self, name):
+        # Ignore HTML entities (already unescaped)
+        self.fed.append(u'&' + name)
+
     def get_data(self):
         return ''.join(self.fed)
 
