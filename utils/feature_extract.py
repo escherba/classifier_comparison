@@ -1,6 +1,5 @@
 import logging
 import re
-import numpy as np
 
 from HTMLParser import HTMLParser
 from nltk.stem import WordNetLemmatizer
@@ -21,6 +20,10 @@ class MLStripper(HTMLParser):
 
     def handle_data(self, d):
         self.fed.append(d)
+
+    def handle_entityref(self, name):
+        # Ignore HTML entities (already unescaped)
+        self.fed.append(u'&' + name)
 
     def get_data(self):
         return ''.join(self.fed)
@@ -139,15 +142,21 @@ class TextExtractor(base.BaseEstimator,
         return self
 
     def clean_(self, soup):
-        unescaped_soup = self.html_parser.unescape(soup)
+        # Step 1: unescape (twice)
+        html_parser = self.html_parser
+        unescaped_soup = html_parser.unescape(html_parser.unescape(soup))
+
+        # Step 2: strip HTML tags
         text = clean_html(unescaped_soup)
+
+        # Step 3: remove zero-width characters
         cleaned = text.translate(self.normalize_map).lower()
         return cleaned
 
     def transform(self, X, y=None):
         column = self.column
-        result = [self.clean_(row[column]) for row in X]
-        return np.asarray(result,  dtype=np.unicode)
+        for row in X:
+            yield self.clean_(row[column])
 
     def get_feature_names(self):
         return [self.column]
