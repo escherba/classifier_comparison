@@ -144,6 +144,7 @@ elif opts.vectorizer == "tfidf":
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.3,
                                  stop_words='english')
 
+
 content_pipeline = FeaturePipeline([
     ('cont1', TextExtractor(content_column)),
     ('vec', vectorizer),
@@ -179,6 +180,7 @@ if opts.vectorizer == "hashing":
     X_train = preprocess.transform(data_train.data)
 elif opts.vectorizer == "tfidf":
     X_train = preprocess.fit_transform(data_train.data)
+
 
 duration = time() - t0
 print("X_train: n_samples: %d, n_features: %d" % X_train.shape)
