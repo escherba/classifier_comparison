@@ -120,9 +120,10 @@ class ChiSqBigramFinder(base.BaseEstimator,
 class TextExtractor(base.BaseEstimator,
                     base.TransformerMixin):
 
-    def __init__(self, column):
+    def __init__(self, column=None, lowercase=True):
         self.column = column
-        self.html_parser = HTMLParser()
+        self.lowercase = lowercase
+        self.html_parser_ = HTMLParser()
         self.normalize_map = {k: None for k in (
             range(ord(u'\x00'), ord(u'\x08') + 1) +
             range(ord(u'\x0b'), ord(u'\x0c') + 1) +
@@ -143,20 +144,22 @@ class TextExtractor(base.BaseEstimator,
 
     def clean_(self, soup):
         # Step 1: unescape (twice)
-        html_parser = self.html_parser
+        html_parser = self.html_parser_
         unescaped_soup = html_parser.unescape(html_parser.unescape(soup))
 
         # Step 2: strip HTML tags
         text = clean_html(unescaped_soup)
 
         # Step 3: remove zero-width characters
-        cleaned = text.translate(self.normalize_map).lower()
-        return cleaned
+        cleaned = text if text == '' else text.translate(self.normalize_map)
+
+        return cleaned.lower() if self.lowercase else cleaned
 
     def transform(self, X, y=None):
         column = self.column
         for row in X:
-            yield self.clean_(row[column])
+            text = row if self.column is None else row[column]
+            yield self.clean_(text)
 
     def get_feature_names(self):
         return [self.column]

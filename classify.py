@@ -10,6 +10,8 @@ from __future__ import print_function
 import logging
 import json
 import sys
+import os
+import re
 
 from time import time
 from argparse import ArgumentParser
@@ -24,7 +26,7 @@ from sklearn.linear_model import RidgeClassifier, SGDClassifier, \
     LogisticRegression, Perceptron, PassiveAggressiveClassifier
 from sklearn.svm import LinearSVC
 # from sklearn import svm
-from sklearn.naive_bayes import BernoulliNB, MultinomialNB
+from sklearn.naive_bayes import BernoulliNB, MultinomialNB, BaseDiscreteNB
 from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
 from sklearn.utils.extmath import density
 from sklearn.metrics import roc_curve, auc, f1_score, classification_report, \
@@ -33,7 +35,7 @@ from sklearn.pipeline import FeatureUnion
 from sklearn.decomposition import TruncatedSVD
 # from sklearn.preprocessing import StandardScaler, Normalizer
 
-from utils import to_csv
+from utils import to_csv, split_num
 from utils.lfcorpus import get_data_frame, get_data_frames
 from utils.feature_extract import with_l1_feature_selection, TextExtractor, \
     FeaturePipeline, PCAPipeline, ChiSqBigramFinder
@@ -68,19 +70,20 @@ op.add_argument("--data_train", type=str,
                 help="data directory")
 op.add_argument("--data_test", type=str,
                 help="data directory")
+op.add_argument("--output_dir", type=str, help="output path (for features)")
 op.add_argument("--output", type=str, help="output path")
 op.add_argument("--output_roc", type=str,  help="output path (ROC)")
 
 opts = op.parse_args()
 
+content_column = None
 if opts.data_train and opts.data_test:
     print("manually specified corpus")
+    content_column = "content"
     data_train = get_data_frame(
         opts.data_train,
         lambda line: json.loads(line),
         extension=".timetest")
-    categories = data_train.target_names
-
     data_test = get_data_frame(
         opts.data_test,
         lambda line: json.loads(line),
@@ -96,7 +99,7 @@ elif opts.data_dir is None:
         'comp.graphics',
         'sci.space',
     ]
-    fields_to_remove = ('headers', 'footers', 'quotes')
+    fields_to_remove = ()  # ('headers', 'footers', 'quotes')
     print("Loading 20 newsgroups dataset for categories:")
     print(categories if categories else "all")
     data_train = fetch_20newsgroups(subset='train', categories=categories,
@@ -107,11 +110,13 @@ elif opts.data_dir is None:
                                    remove=fields_to_remove)
 else:
     # Load custom corpus
+    content_column = "content"
     print("loading custom corpus")
     data_train, data_test = get_data_frames(
         opts.data_dir,
         lambda line: json.loads(line))
-    categories = data_train.target_names
+
+categories = data_train.target_names
 
 if len(data_train.data) == 0:
     logger.error("No training data loaded")
@@ -139,28 +144,29 @@ elif opts.vectorizer == "tfidf":
     vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=0.3,
                                  stop_words='english')
 
+
 content_pipeline = FeaturePipeline([
-    ('cont1', TextExtractor('content')),
+    ('cont1', TextExtractor(content_column)),
     ('vec', vectorizer),
 ])
 pca_pipeline = PCAPipeline([
-    ('cont2', TextExtractor('content')),
+    ('cont2', TextExtractor(content_column)),
     ('vectf', TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                               stop_words='english')),
     ('pca', TruncatedSVD(n_components=PCA_components))
 ])
 colloc_pipeline = FeaturePipeline([
-    ('cont1', TextExtractor('content')),
+    ('cont1', TextExtractor(content_column)),
     ('coll', ChiSqBigramFinder(score_thr=50)),
     ('vectc', DictVectorizer())
 ])
 #lang_pipeline = FeaturePipeline([
-#    ('cont3', TextExtractor('content')),
+#    ('cont3', TextExtractor(content_column)),
 #    ('lang', FeatureLang()),
 #    ('dvec', DictVectorizer()),
 #])
 #len_pipeline = FeaturePipeline([
-#    ('cont4', TextExtractor('content')),
+#    ('cont4', TextExtractor(content_column)),
 #    ('len', LengthVectorizer())
 #])
 preprocess = FeatureUnion([
@@ -174,6 +180,7 @@ if opts.vectorizer == "hashing":
     X_train = preprocess.transform(data_train.data)
 elif opts.vectorizer == "tfidf":
     X_train = preprocess.fit_transform(data_train.data)
+
 
 duration = time() - t0
 print("X_train: n_samples: %d, n_features: %d" % X_train.shape)
@@ -217,6 +224,15 @@ all_roc_data = []
 
 
 def benchmark(clf, clf_descr=None):
+
+    def print_top_terms(clf_descr, category, cpairs):
+        to_csv(os.path.join(opts.output_dir,
+                            "feat_%s_%s.csv" %
+                            (clf_descr, category)), [(re.sub('^[A-Za-z]+__', '', t).encode("utf-8"), c) for t, c in cpairs])
+        #print("%s\n%s" %
+        #      (category, ' '.join((u"%s:%f" % (t, coeff))
+        #                          for t, coeff in cpairs)))
+
     print('_' * 80)
 
     if clf_descr is None:
@@ -259,7 +275,17 @@ def benchmark(clf, clf_descr=None):
     except ValueError as e:
         logger.error(e)
     if probas_ is not None and e is None:
-        fpr, tpr, thresholds = roc_curve(y_test, probas_)
+        if opts.data_dir is None:
+            if len(probas_.shape) > 1:
+                roc_predicted = probas_[:, 3]
+            else:
+                roc_predicted = probas_
+            roc_observed = [1 if y == 3 else 0 for y in y_test]
+        else:
+            roc_predicted = probas_
+            roc_observed = y_test
+
+        fpr, tpr, thresholds = roc_curve(roc_observed, roc_predicted)
         roc_auc = auc(fpr, tpr)
         labels = [clf_descr] * len(fpr)
         all_roc_data.extend(zip(labels, fpr, tpr))
@@ -271,14 +297,47 @@ def benchmark(clf, clf_descr=None):
 
         if opts.top_terms is not None and feature_names is not None:
             print("top %d keywords per class:" % opts.top_terms)
-            for i, category in enumerate(categories[1:]):
-                top_terms = np.argsort(clf.coef_[i])[-opts.top_terms:]
-                if clf.__class__.__name__.startswith("FeatureSelect"):
-                    tfnames = clf.transformer_.transform(feature_names)[0]
-                else:
-                    tfnames = feature_names
-                print("%s\n %s" % (category, ' '.
-                                   join(tfnames[top_terms]).encode('utf-8')))
+
+            tfnames = clf.transformer_.transform(feature_names)[0] \
+                if clf.__class__.__name__.startswith("FeatureSelect") \
+                else feature_names
+            num_cat = len(categories)
+            buckets = split_num(len(tfnames), num_cat)
+            if num_cat == 2:  # Binomial classification
+
+                coefficients = clf.coef_[0]
+
+                # Class 0
+                indices = np.argsort(coefficients)
+                size0 = min(opts.top_terms, buckets[0])
+                top_indices_0 = indices[:size0]
+                cpairs = zip(tfnames[top_indices_0],
+                             coefficients[top_indices_0])
+                if not isinstance(clf, BaseDiscreteNB):  # filter coefficients
+                    cpairs = [(f, -c) for (f, c) in cpairs if c < 0.0]
+                print_top_terms(clf_descr, categories[0], cpairs)
+
+                # Class 1
+                indices = np.argsort(coefficients)
+                size1 = min(opts.top_terms, buckets[1])
+                top_indices_1 = indices[-size1:][::-1]
+                cpairs = zip(tfnames[top_indices_1],
+                             coefficients[top_indices_1])
+                if not isinstance(clf, BaseDiscreteNB):  # filter coefficients
+                    cpairs = [(f, c) for (f, c) in cpairs if c > 0.0]
+                print_top_terms(clf_descr, categories[1], cpairs)
+
+            else:                     # Multinomial classification
+                for i, category in enumerate(categories):
+                    coefficients = clf.coef_[i]
+                    indices = np.argsort(coefficients)
+                    size = min(opts.top_terms, buckets[i])
+                    top_indices = indices[-size:][::-1]
+                    cpairs = zip(tfnames[top_indices],
+                                 coefficients[top_indices])
+                    if not isinstance(clf, BaseDiscreteNB):  # filter coeffs
+                        cpairs = [(f, c) for (f, c) in cpairs if c > 0.0]
+                    print_top_terms(clf_descr, category, cpairs)
 
         print()
 
@@ -313,7 +372,7 @@ for penalty in ["l2", "l1"]:
     print("LinearSVC with %s penalty" % penalty.upper())
     results.append(benchmark(
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
-        "LinearSVC (" + penalty.upper() + " penalty)"))
+        "LinearSVC_" + penalty.upper()))
 
 
 print('=' * 80)
@@ -322,7 +381,7 @@ results.append(benchmark(
     with_l1_feature_selection(
         LinearSVC, C=0.1, dual=False, tol=1e-3
     )(),
-    "LinearSVC (L1 feature select)"))
+    "LinearSVC_L1_featsel"))
 
 
 for penalty in ["l2", "l1"]:
@@ -330,7 +389,7 @@ for penalty in ["l2", "l1"]:
     print("Logistic Regression with %s penalty" % penalty.upper())
     results.append(benchmark(
         LogisticRegression(penalty=penalty, dual=False, tol=1e-3),
-        "LogisticRegression (" + penalty.upper() + " penalty)"))
+        "LogisticRegression_" + penalty.upper()))
 
 
 print('=' * 80)
@@ -339,14 +398,14 @@ results.append(benchmark(
     with_l1_feature_selection(
         LogisticRegression, C=0.42, dual=False, tol=1e-3
     )(),
-    "LogisticRegression (L1-feature select)"))
+    "LogisticRegression_L1_featsel"))
 
 for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("SGD with %s penalty" % penalty.upper())
     results.append(benchmark(
         SGDClassifier(loss='log', alpha=1e-4, n_iter=50, penalty=penalty),
-        "SGD (" + penalty.upper() + " penalty)"))
+        "SGD_" + penalty.upper()))
 
 # print('=' * 80)
 # print("SGD with elasticnet penalty")
@@ -360,7 +419,7 @@ print("SGD L1 feature selection")
 clf = with_l1_feature_selection(
     SGDClassifier, loss='log', alpha=0.00021, n_iter=10
     )(loss='log', alpha=.0001, n_iter=50)
-results.append(benchmark(clf, "SGD (L1-feature select)"))
+results.append(benchmark(clf, "SGD_L1_featsel"))
 
 
 # print('=' * 80)
