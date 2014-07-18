@@ -372,7 +372,7 @@ for penalty in ["l2", "l1"]:
     print("LinearSVC with %s penalty" % penalty.upper())
     results.append(benchmark(
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
-        "LinearSVC (" + penalty.upper() + " penalty)"))
+        "LinearSVC_" + penalty.upper()))
 
 
 print('=' * 80)
@@ -381,7 +381,7 @@ results.append(benchmark(
     with_l1_feature_selection(
         LinearSVC, C=0.1, dual=False, tol=1e-3
     )(),
-    "LinearSVC (L1 feature select)"))
+    "LinearSVC_L1_featsel"))
 
 
 for penalty in ["l2", "l1"]:
@@ -389,7 +389,7 @@ for penalty in ["l2", "l1"]:
     print("Logistic Regression with %s penalty" % penalty.upper())
     results.append(benchmark(
         LogisticRegression(penalty=penalty, dual=False, tol=1e-3),
-        "LogisticRegression (" + penalty.upper() + " penalty)"))
+        "LogisticRegression_" + penalty.upper()))
 
 
 print('=' * 80)
@@ -398,14 +398,14 @@ results.append(benchmark(
     with_l1_feature_selection(
         LogisticRegression, C=0.42, dual=False, tol=1e-3
     )(),
-    "LogisticRegression (L1-feature select)"))
+    "LogisticRegression_L1_featsel"))
 
 for penalty in ["l2", "l1"]:
     print('=' * 80)
     print("SGD with %s penalty" % penalty.upper())
     results.append(benchmark(
         SGDClassifier(loss='log', alpha=1e-4, n_iter=50, penalty=penalty),
-        "SGD (" + penalty.upper() + " penalty)"))
+        "SGD_" + penalty.upper()))
 
 # print('=' * 80)
 # print("SGD with elasticnet penalty")
@@ -419,7 +419,7 @@ print("SGD L1 feature selection")
 clf = with_l1_feature_selection(
     SGDClassifier, loss='log', alpha=0.00021, n_iter=10
     )(loss='log', alpha=.0001, n_iter=50)
-results.append(benchmark(clf, "SGD (L1-feature select)"))
+results.append(benchmark(clf, "SGD_L1_featsel"))
 
 
 # print('=' * 80)
