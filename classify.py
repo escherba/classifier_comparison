@@ -10,6 +10,8 @@ from __future__ import print_function
 import logging
 import json
 import sys
+import os
+import re
 
 from time import time
 from argparse import ArgumentParser
@@ -24,7 +26,7 @@ from sklearn.linear_model import RidgeClassifier, SGDClassifier, \
     LogisticRegression, Perceptron, PassiveAggressiveClassifier
 from sklearn.svm import LinearSVC
 # from sklearn import svm
-from sklearn.naive_bayes import BernoulliNB, MultinomialNB
+from sklearn.naive_bayes import BernoulliNB, MultinomialNB, BaseDiscreteNB
 from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
 from sklearn.utils.extmath import density
 from sklearn.metrics import roc_curve, auc, f1_score, classification_report, \
@@ -33,7 +35,7 @@ from sklearn.pipeline import FeatureUnion
 from sklearn.decomposition import TruncatedSVD
 # from sklearn.preprocessing import StandardScaler, Normalizer
 
-from utils import to_csv
+from utils import to_csv, split_num
 from utils.lfcorpus import get_data_frame, get_data_frames
 from utils.feature_extract import with_l1_feature_selection, TextExtractor, \
     FeaturePipeline, PCAPipeline, ChiSqBigramFinder
@@ -68,6 +70,7 @@ op.add_argument("--data_train", type=str,
                 help="data directory")
 op.add_argument("--data_test", type=str,
                 help="data directory")
+op.add_argument("--output_dir", type=str, help="output path (for features)")
 op.add_argument("--output", type=str, help="output path")
 op.add_argument("--output_roc", type=str,  help="output path (ROC)")
 
@@ -220,8 +223,13 @@ all_roc_data = []
 
 def benchmark(clf, clf_descr=None):
 
-    def print_top_terms(category, terms, coeff):
-        print("%s\n%s" % (category, ' '.join((u"%s:%f" % (t, coeff)) for t, coeff in zip(terms, coeff))))
+    def print_top_terms(clf_descr, category, cpairs):
+        to_csv(os.path.join(opts.output_dir,
+                            "feat_%s_%s.csv" %
+                            (clf_descr, category)), [(re.sub('^[A-Za-z]+__', '', t).encode("utf-8"), c) for t, c in cpairs])
+        #print("%s\n%s" %
+        #      (category, ' '.join((u"%s:%f" % (t, coeff))
+        #                          for t, coeff in cpairs)))
 
     print('_' * 80)
 
@@ -291,27 +299,43 @@ def benchmark(clf, clf_descr=None):
             tfnames = clf.transformer_.transform(feature_names)[0] \
                 if clf.__class__.__name__.startswith("FeatureSelect") \
                 else feature_names
-            if len(categories) == 2:  # Binomial classification
+            num_cat = len(categories)
+            buckets = split_num(len(tfnames), num_cat)
+            if num_cat == 2:  # Binomial classification
+
                 coefficients = clf.coef_[0]
-                indices = np.argsort(coefficients)
 
                 # Class 0
-                top_indices_0 = indices[:opts.top_terms]
-                print_top_terms(categories[0], tfnames[top_indices_0],
-                                coefficients[top_indices_0])
+                indices = np.argsort(coefficients)
+                size0 = min(opts.top_terms, buckets[0])
+                top_indices_0 = indices[:size0]
+                cpairs = zip(tfnames[top_indices_0],
+                             coefficients[top_indices_0])
+                if not isinstance(clf, BaseDiscreteNB):  # filter coefficients
+                    cpairs = [(f, -c) for (f, c) in cpairs if c < 0.0]
+                print_top_terms(clf_descr, categories[0], cpairs)
 
                 # Class 1
-                top_indices_1 = indices[-opts.top_terms:][::-1]
-                print_top_terms(categories[1], tfnames[top_indices_1],
-                                coefficients[top_indices_1])
+                indices = np.argsort(coefficients)
+                size1 = min(opts.top_terms, buckets[1])
+                top_indices_1 = indices[-size1:][::-1]
+                cpairs = zip(tfnames[top_indices_1],
+                             coefficients[top_indices_1])
+                if not isinstance(clf, BaseDiscreteNB):  # filter coefficients
+                    cpairs = [(f, c) for (f, c) in cpairs if c > 0.0]
+                print_top_terms(clf_descr, categories[1], cpairs)
 
             else:                     # Multinomial classification
                 for i, category in enumerate(categories):
                     coefficients = clf.coef_[i]
                     indices = np.argsort(coefficients)
-                    top_indices = indices[-opts.top_terms:][::-1]
-                    print_top_terms(category, tfnames[top_indices],
-                                    coefficients[top_indices])
+                    size = min(opts.top_terms, buckets[i])
+                    top_indices = indices[-size:][::-1]
+                    cpairs = zip(tfnames[top_indices],
+                                 coefficients[top_indices])
+                    if not isinstance(clf, BaseDiscreteNB):  # filter coeffs
+                        cpairs = [(f, c) for (f, c) in cpairs if c > 0.0]
+                    print_top_terms(clf_descr, category, cpairs)
 
         print()
 

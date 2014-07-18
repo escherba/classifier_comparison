@@ -56,11 +56,13 @@ extract_topics: topic_extraction.py
 .PRECIOUS: $(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores
 $(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py
 	$(PYTHON) $< \
+		--data_dir $(CORPUS_DIR) \
 		--vectorizer tfidf \
 		--top_terms 100 \
-		--data_dir $(CORPUS_DIR) \
+		--output_dir $(dir $@) \
 		--output_roc $(basename $@).roc \
 		--output     $(basename $@).scores
+
 
 .PRECIOUS: $(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores
 $(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py
@@ -69,6 +71,7 @@ $(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores: %: classify.py utils/fea
 		--vectorizer tfidf \
 		--data_test $(CORPUS_DIR3) \
 		--data_train $(CORPUS_DIR2) \
+		--output_dir $(dir $@) \
 		--output_roc $(basename $@).roc \
 		--output     $(basename $@).scores
 
