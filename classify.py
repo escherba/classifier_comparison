@@ -73,14 +73,14 @@ op.add_argument("--output_roc", type=str,  help="output path (ROC)")
 
 opts = op.parse_args()
 
+content_column = None
 if opts.data_train and opts.data_test:
     print("manually specified corpus")
+    content_column = "content"
     data_train = get_data_frame(
         opts.data_train,
         lambda line: json.loads(line),
         extension=".timetest")
-    categories = data_train.target_names
-
     data_test = get_data_frame(
         opts.data_test,
         lambda line: json.loads(line),
@@ -96,7 +96,7 @@ elif opts.data_dir is None:
         'comp.graphics',
         'sci.space',
     ]
-    fields_to_remove = ('headers', 'footers', 'quotes')
+    fields_to_remove = ()  # ('headers', 'footers', 'quotes')
     print("Loading 20 newsgroups dataset for categories:")
     print(categories if categories else "all")
     data_train = fetch_20newsgroups(subset='train', categories=categories,
@@ -107,11 +107,13 @@ elif opts.data_dir is None:
                                    remove=fields_to_remove)
 else:
     # Load custom corpus
+    content_column = "content"
     print("loading custom corpus")
     data_train, data_test = get_data_frames(
         opts.data_dir,
         lambda line: json.loads(line))
-    categories = data_train.target_names
+
+categories = data_train.target_names
 
 if len(data_train.data) == 0:
     logger.error("No training data loaded")
@@ -140,27 +142,27 @@ elif opts.vectorizer == "tfidf":
                                  stop_words='english')
 
 content_pipeline = FeaturePipeline([
-    ('cont1', TextExtractor('content')),
+    ('cont1', TextExtractor(content_column)),
     ('vec', vectorizer),
 ])
 pca_pipeline = PCAPipeline([
-    ('cont2', TextExtractor('content')),
+    ('cont2', TextExtractor(content_column)),
     ('vectf', TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                               stop_words='english')),
     ('pca', TruncatedSVD(n_components=PCA_components))
 ])
 colloc_pipeline = FeaturePipeline([
-    ('cont1', TextExtractor('content')),
+    ('cont1', TextExtractor(content_column)),
     ('coll', ChiSqBigramFinder(score_thr=50)),
     ('vectc', DictVectorizer())
 ])
 #lang_pipeline = FeaturePipeline([
-#    ('cont3', TextExtractor('content')),
+#    ('cont3', TextExtractor(content_column)),
 #    ('lang', FeatureLang()),
 #    ('dvec', DictVectorizer()),
 #])
 #len_pipeline = FeaturePipeline([
-#    ('cont4', TextExtractor('content')),
+#    ('cont4', TextExtractor(content_column)),
 #    ('len', LengthVectorizer())
 #])
 preprocess = FeatureUnion([
@@ -217,6 +219,10 @@ all_roc_data = []
 
 
 def benchmark(clf, clf_descr=None):
+
+    def print_top_terms(category, terms, coeff):
+        print("%s\n%s" % (category, ' '.join((u"%s:%f" % (t, coeff)) for t, coeff in zip(terms, coeff))))
+
     print('_' * 80)
 
     if clf_descr is None:
@@ -259,7 +265,17 @@ def benchmark(clf, clf_descr=None):
     except ValueError as e:
         logger.error(e)
     if probas_ is not None and e is None:
-        fpr, tpr, thresholds = roc_curve(y_test, probas_)
+        if opts.data_dir is None:
+            if len(probas_.shape) > 1:
+                roc_predicted = probas_[:, 3]
+            else:
+                roc_predicted = probas_
+            roc_observed = [1 if y == 3 else 0 for y in y_test]
+        else:
+            roc_predicted = probas_
+            roc_observed = y_test
+
+        fpr, tpr, thresholds = roc_curve(roc_observed, roc_predicted)
         roc_auc = auc(fpr, tpr)
         labels = [clf_descr] * len(fpr)
         all_roc_data.extend(zip(labels, fpr, tpr))
@@ -271,14 +287,31 @@ def benchmark(clf, clf_descr=None):
 
         if opts.top_terms is not None and feature_names is not None:
             print("top %d keywords per class:" % opts.top_terms)
-            for i, category in enumerate(categories[1:]):
-                top_terms = np.argsort(clf.coef_[i])[-opts.top_terms:]
-                if clf.__class__.__name__.startswith("FeatureSelect"):
-                    tfnames = clf.transformer_.transform(feature_names)[0]
-                else:
-                    tfnames = feature_names
-                print("%s\n %s" % (category, ' '.
-                                   join(tfnames[top_terms]).encode('utf-8')))
+
+            tfnames = clf.transformer_.transform(feature_names)[0] \
+                if clf.__class__.__name__.startswith("FeatureSelect") \
+                else feature_names
+            if len(categories) == 2:  # Binomial classification
+                coefficients = clf.coef_[0]
+                indices = np.argsort(coefficients)
+
+                # Class 0
+                top_indices_0 = indices[:opts.top_terms]
+                print_top_terms(categories[0], tfnames[top_indices_0],
+                                coefficients[top_indices_0])
+
+                # Class 1
+                top_indices_1 = indices[-opts.top_terms:][::-1]
+                print_top_terms(categories[1], tfnames[top_indices_1],
+                                coefficients[top_indices_1])
+
+            else:                     # Multinomial classification
+                for i, category in enumerate(categories):
+                    coefficients = clf.coef_[i]
+                    indices = np.argsort(coefficients)
+                    top_indices = indices[-opts.top_terms:][::-1]
+                    print_top_terms(category, tfnames[top_indices],
+                                    coefficients[top_indices])
 
         print()
 
