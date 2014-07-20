@@ -213,7 +213,7 @@ if opts.select_chi2:
     X_test = ch2.transform(X_test)
     print("done in %fs" % (time() - t0))
     print()
-    if feature_names:
+    if feature_names is not None:
         feature_names = ch2.transform(feature_names)[0]
 
 
@@ -372,7 +372,7 @@ for penalty in ["l2", "l1"]:
     print("LinearSVC with %s penalty" % penalty.upper())
     results.append(benchmark(
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
-        "LinearSVC_" + penalty.upper()))
+        "LinearSVC_" + penalty.upper() + "_std"))
 
 
 print('=' * 80)
@@ -389,7 +389,7 @@ for penalty in ["l2", "l1"]:
     print("Logistic Regression with %s penalty" % penalty.upper())
     results.append(benchmark(
         LogisticRegression(penalty=penalty, dual=False, tol=1e-3),
-        "LogisticRegression_" + penalty.upper()))
+        "LogisticRegression_" + penalty.upper() + "_std"))
 
 
 print('=' * 80)
@@ -405,7 +405,7 @@ for penalty in ["l2", "l1"]:
     print("SGD with %s penalty" % penalty.upper())
     results.append(benchmark(
         SGDClassifier(loss='log', alpha=1e-4, n_iter=50, penalty=penalty),
-        "SGD_" + penalty.upper()))
+        "SGD_" + penalty.upper() + "_std"))
 
 # print('=' * 80)
 # print("SGD with elasticnet penalty")
