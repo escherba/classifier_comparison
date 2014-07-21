@@ -126,16 +126,6 @@ if len(data_test.data) == 0:
     logger.error("No testing data loaded")
     sys.exit(1)
 
-print('data loaded')
-
-y_train, y_test = data_train.target, data_test.target
-
-print("Extracting features from the training dataset "
-      "using a sparse vectorizer")
-t0 = time()
-
-PCA_components = 5
-
 
 if opts.vectorizer == "hashing":
     vectorizer = HashingVectorizer(stop_words='english', non_negative=True,
@@ -153,7 +143,7 @@ pca_pipeline = PCAPipeline([
     ('cont2', TextExtractor(content_column)),
     ('vectf', TfidfVectorizer(sublinear_tf=True, max_df=0.4,
                               stop_words='english')),
-    ('pca', TruncatedSVD(n_components=PCA_components))
+    ('pca', TruncatedSVD(n_components=5))
 ])
 colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor(content_column)),
@@ -172,16 +162,16 @@ colloc_pipeline = FeaturePipeline([
 preprocess = FeatureUnion([
     ('w', content_pipeline),
     ('bi', colloc_pipeline),
+    #('p', pca_pipeline)
     #('lp', lang_pipeline),
     # ('mp', len_pipeline)
 ])
 
-if opts.vectorizer == "hashing":
-    X_train = preprocess.transform(data_train.data)
-elif opts.vectorizer == "tfidf":
-    X_train = preprocess.fit_transform(data_train.data)
 
-
+print("Extracting features from the training dataset "
+      "using a sparse vectorizer")
+t0 = time()
+X_train = preprocess.fit_transform(data_train.data)
 duration = time() - t0
 print("X_train: n_samples: %d, n_features: %d" % X_train.shape)
 print()
@@ -192,6 +182,9 @@ X_test = preprocess.transform(data_test.data)
 duration = time() - t0
 print("X_test: n_samples: %d, n_features: %d" % X_test.shape)
 print()
+
+
+y_train, y_test = data_train.target, data_test.target
 
 
 # mapping from integer feature name to original token string
@@ -213,7 +206,7 @@ if opts.select_chi2:
     X_test = ch2.transform(X_test)
     print("done in %fs" % (time() - t0))
     print()
-    if feature_names:
+    if feature_names is not None:
         feature_names = ch2.transform(feature_names)[0]
 
 
@@ -372,7 +365,7 @@ for penalty in ["l2", "l1"]:
     print("LinearSVC with %s penalty" % penalty.upper())
     results.append(benchmark(
         LinearSVC(loss='l2', penalty=penalty, dual=False, tol=1e-3),
-        "LinearSVC_" + penalty.upper()))
+        "LinearSVC_" + penalty.upper() + "_std"))
 
 
 print('=' * 80)
@@ -389,7 +382,7 @@ for penalty in ["l2", "l1"]:
     print("Logistic Regression with %s penalty" % penalty.upper())
     results.append(benchmark(
         LogisticRegression(penalty=penalty, dual=False, tol=1e-3),
-        "LogisticRegression_" + penalty.upper()))
+        "LogisticRegression_" + penalty.upper() + "_std"))
 
 
 print('=' * 80)
@@ -405,7 +398,7 @@ for penalty in ["l2", "l1"]:
     print("SGD with %s penalty" % penalty.upper())
     results.append(benchmark(
         SGDClassifier(loss='log', alpha=1e-4, n_iter=50, penalty=penalty),
-        "SGD_" + penalty.upper()))
+        "SGD_" + penalty.upper() + "_std"))
 
 # print('=' * 80)
 # print("SGD with elasticnet penalty")
