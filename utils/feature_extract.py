@@ -9,6 +9,7 @@ from sklearn.pipeline import Pipeline
 from nltk.collocations import BigramCollocationFinder
 from nltk.metrics import BigramAssocMeasures
 from nltk.tokenize.treebank import TreebankWordTokenizer
+from nltk.tokenize.regexp import WordPunctTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ class ChiSqBigramFinder(base.BaseEstimator,
 
     def __init__(self, tokenizer=None, score_thr=50):
         self.score_thr = score_thr
-        self.tokenizer = TreebankWordTokenizer() \
+        self.tokenizer = WordPunctTokenizer() \
             if tokenizer is None else tokenizer
 
     def fit(self, X, y=None):
@@ -102,7 +103,7 @@ class ChiSqBigramFinder(base.BaseEstimator,
         """
         Match separating punctuation (commas, periods, but not colons, hyphens)
         """
-        return w in {'.', ',', ';'}
+        return w in {u'.', u',', u';', u'?', u'!', u'(', u')', '[', ']'}
 
     def transform(self, X, y=None):
         result = []

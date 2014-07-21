@@ -59,6 +59,7 @@ $(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores: %: classify.py utils/featu
 		--data_dir $(CORPUS_DIR) \
 		--vectorizer tfidf \
 		--top_terms 100 \
+		--chi2_select 400 \
 		--output_dir $(dir $@) \
 		--output_roc $(basename $@).roc \
 		--output     $(basename $@).scores
