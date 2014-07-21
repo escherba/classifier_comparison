@@ -103,7 +103,7 @@ class ChiSqBigramFinder(base.BaseEstimator,
         """
         Match separating punctuation (commas, periods, but not colons, hyphens)
         """
-        return w in {u'.', u',', u';', u'?', u'!', u'(', u')', '[', ']'}
+        return w in {u'.', u',', u';', u'?', u'!', u'(', u')', u'[', u']'}
 
     def transform(self, X, y=None):
         result = []
