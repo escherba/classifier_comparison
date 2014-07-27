@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from omnihack import enumerator
+from pymaptools import enumerator
 from sklearn.datasets.base import Bunch
 from sklearn.cross_validation import train_test_split
 
