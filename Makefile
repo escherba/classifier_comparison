@@ -18,6 +18,15 @@ env: requirements.txt
 	$(PYENV) easy_install ipython
 	mkdir -p $(OUTPUT)
 
+.PHONY: freq_spam
+freq_spam: ./freq_patterns.py utils/lfcorpus.py
+	$(PYTHON) freq_patterns.py --category spam --minsup 2000 $(CORPUS_DIR)
+
+.PHONY: freq_ham
+freq_ham: ./freq_patterns.py utils/lfcorpus.py
+	$(PYTHON) freq_patterns.py --category ham --minsup 300 $(CORPUS_DIR)
+	
+
 browser.plot: $(PLOT_INTERMEDIATE).browser
 browser.plot_time: $(PLOT_INTERMEDIATE2).browser
 

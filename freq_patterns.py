@@ -18,12 +18,22 @@ def read_json(filename):
             yield json_obj
 
 
-def content_from_dir(input_dir):
+def content_from_dir(input_dir, category=None):
     data_train, data_test = get_data_frames(
         input_dir,
         lambda line: json.loads(line))
 
-    for x in transform_data(data_train['data']):
+    data = data_train['data']
+    if category is not None:
+        filtered = []
+        target = data_train['target']
+        target_names = data_train['target_names']
+        for x, y in zip(data, target):
+            if target_names[y] == category:
+                filtered.append(x)
+    else:
+        filtered = data
+    for x in transform_data(filtered):
         yield x
 
 
@@ -54,13 +64,15 @@ def content_from_file(filename):
 if __name__ == '__main__':
     p = ArgumentParser()
     p.add_argument('input', nargs=1)
-    p.add_argument('-s', '--minsup', type=int, default=274,
+    p.add_argument('-s', '--minsup', type=int, default=1000,
                    help='Minimum itemset support')
+    p.add_argument('-c', '--category', type=str, default="spam",
+                   help='Class to perform search on')
     args = p.parse_args()
 
     input = args.input[0]
     if isdir(input):
-        content_gen = content_from_dir(input)
+        content_gen = content_from_dir(input, category=args.category)
     else:
         content_gen = content_from_file(input)
 
