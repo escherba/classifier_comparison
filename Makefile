@@ -20,11 +20,11 @@ env: requirements.txt
 
 .PHONY: freq_spam
 freq_spam: ./freq_patterns.py utils/lfcorpus.py
-	$(PYTHON) freq_patterns.py --category spam --minsup 1500 $(CORPUS_DIR)
+	$(PYTHON) freq_patterns.py --category spam --minsup 1500 $(CORPUS_DIR) | sort -k1nr
 
 .PHONY: freq_ham
 freq_ham: ./freq_patterns.py utils/lfcorpus.py
-	$(PYTHON) freq_patterns.py --category ham --minsup 200 $(CORPUS_DIR)
+	$(PYTHON) freq_patterns.py --category ham --minsup 150 $(CORPUS_DIR) | sort -k1nr
 	
 
 .PHONY: wordclouds
