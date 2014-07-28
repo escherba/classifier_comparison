@@ -25,7 +25,6 @@ freq_spam: ./freq_patterns.py utils/lfcorpus.py
 .PHONY: freq_ham
 freq_ham: ./freq_patterns.py utils/lfcorpus.py
 	$(PYTHON) freq_patterns.py --category ham --minsup 150 $(CORPUS_DIR) | sort -k1nr
-	
 
 .PHONY: wordclouds
 wordclouds: ./Rscripts/create_wordclouds.R
