@@ -20,12 +20,16 @@ env: requirements.txt
 
 .PHONY: freq_spam
 freq_spam: ./freq_patterns.py utils/lfcorpus.py
-	$(PYTHON) freq_patterns.py --category spam --minsup 2000 $(CORPUS_DIR)
+	$(PYTHON) freq_patterns.py --category spam --minsup 1500 $(CORPUS_DIR)
 
 .PHONY: freq_ham
 freq_ham: ./freq_patterns.py utils/lfcorpus.py
-	$(PYTHON) freq_patterns.py --category ham --minsup 300 $(CORPUS_DIR)
+	$(PYTHON) freq_patterns.py --category ham --minsup 200 $(CORPUS_DIR)
 	
+
+.PHONY: wordclouds
+wordclouds: ./Rscripts/create_wordclouds.R
+	bash make_wordclouds.sh
 
 browser.plot: $(PLOT_INTERMEDIATE).browser
 browser.plot_time: $(PLOT_INTERMEDIATE2).browser
