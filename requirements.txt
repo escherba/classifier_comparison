@@ -5,5 +5,6 @@ langid==1.1.4dev
 nltk==2.0.4
 pandas==0.14.0
 brewer2mpl==1.4
-fp_growth
+fp-growth==0.1.2
 -e git+https://github.com/escherba/pymaptools.git#egg=pymaptools
+-e git+https://github.com/escherba/lsh-hdc#egg=lsh-hdc

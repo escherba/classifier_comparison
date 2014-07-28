@@ -13,7 +13,7 @@ PLOT_INTERMEDIATE2=$(OUTPUT)/fit_metrics_time
 
 env: requirements.txt
 	test -d env || virtualenv --no-site-packages env
-	$(PYENV) pip install -r requirements.txt
+	$(PYENV) pip install --process-dependency-links -r requirements.txt
 	$(PYENV) pip install matplotlib
 	$(PYENV) easy_install ipython
 	mkdir -p $(OUTPUT)
@@ -80,6 +80,9 @@ grid_search: grid_search.py
 	$(PYTHON) $< \
 		--scoring f1 \
 		--data_dir $(CORPUS_DIR)
+
+nuke: clean
+	rm -rf *.egg *.egg-info env bin cover coverage.xml nosetests.xml
 
 clean:
 	find . -type f -name "*.pyc" -exec rm -f {} \;
