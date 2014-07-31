@@ -58,11 +58,3 @@ docs/_build/
 
 # Emacs
 \#*#
-
-
-# Domino
-.domino/
-results/
-
-# Data
-corpora/
