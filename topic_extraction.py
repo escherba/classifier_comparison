@@ -7,7 +7,9 @@ from argparse import ArgumentParser
 
 import json
 
+from itertools import izip
 from time import time
+from scipy import sparse
 from sklearn.feature_extraction import text
 from utils.lfcorpus import get_data_frame
 
@@ -55,20 +57,39 @@ dataset = get_data_frame(
 
 vectorizer = text.CountVectorizer(max_df=0.95, max_features=args.n_features,
                                   lowercase=True, stop_words="english")
-counts = vectorizer.fit_transform(dataset.data[:args.n_samples])
+
+samples = dataset.data[:args.n_samples]
+counts = vectorizer.fit_transform(samples)
 tfidf = text.TfidfTransformer(norm="l2", use_idf=True).fit_transform(counts)
 print("done in %0.3fs." % (time() - t0))
 
 # Fit the model
 print("Fitting the %s model on with n_samples=%d and n_features=%d..."
       % (args.method, args.n_samples, args.n_features))
-nmf = Decomposition(n_components=args.n_topics).fit(tfidf)
+
+num_topics = args.n_topics
+nmf = Decomposition(n_components=num_topics).fit(tfidf)
 print("done in %0.3fs." % (time() - t0))
+
+sparse_nmf = sparse.csr_matrix(nmf.components_)
+topics_x_comments = tfidf.dot(sparse_nmf.transpose())
 
 feature_names = vectorizer.get_feature_names()
 
+topic_names = []
 for j, topic in enumerate(nmf.components_):
     print("Topic #%d:" % j)
-    print([("%.3f" % topic[i], feature_names[i])
-           for i in topic.argsort()[:-args.n_top_words - 1:-1]])
+    weight_words = [(topic[i], feature_names[i])
+                    for i in topic.argsort()[:-args.n_top_words - 1:-1]]
+    print(weight_words)
+    top_word = weight_words[0][1]
+    topic_names.append("%d-%s" % (j, top_word))
     print()
+
+for sample, topics in izip(samples, topics_x_comments):
+    m = topics.todense()
+    found_topics = sorted([(round(m[0, i], 3), topic_names[i])
+                           for i in range(0, num_topics)], reverse=True)
+    if 'health' not in sample and 'health' in found_topics[0][1]:
+        print(sample, found_topics[:3])
+        print()
