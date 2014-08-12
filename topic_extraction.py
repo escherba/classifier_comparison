@@ -24,7 +24,7 @@ op.add_argument("--method", default="NMF", type=str, choices=["NMF", "SVD"],
 op.add_argument("--n_top_words", default=20, type=int,
                 help="number of top words to print")
 op.add_argument("--categories", nargs="+", type=str,
-                help="number of top words to print")
+                help="Categories (e.g. spam, ham)")
 op.add_argument("--data_dir", type=str,
                 help="data directory", required=True)
 
@@ -65,11 +65,10 @@ print("Fitting the %s model on with n_samples=%d and n_features=%d..."
 nmf = Decomposition(n_components=args.n_topics).fit(tfidf)
 print("done in %0.3fs." % (time() - t0))
 
-# Inverse the vectorizer vocabulary to be able
 feature_names = vectorizer.get_feature_names()
 
-for topic_idx, topic in enumerate(nmf.components_):
-    print("Topic #%d:" % topic_idx)
-    print(" ".join([feature_names[i]
-                    for i in topic.argsort()[:-args.n_top_words - 1:-1]]))
+for j, topic in enumerate(nmf.components_):
+    print("Topic #%d:" % j)
+    print([("%.3f" % topic[i], feature_names[i])
+           for i in topic.argsort()[:-args.n_top_words - 1:-1]])
     print()
