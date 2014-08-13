@@ -57,6 +57,13 @@ extract_topics: topic_extraction.py
 		--n_features 4000 \
 		--categories spam
 
+ap: affinity_propagation.py
+	$(PYTHON) $< \
+		--data_dir $(CORPUS_DIR) \
+		--n_samples 1000 \
+		--n_features 100 \
+		--categories spam
+
 .PRECIOUS: $(PLOT_INTERMEDIATE).roc.png $(PLOT_INTERMEDIATE2).roc.png
 %.roc.png: plot_roc.py %.roc
 	$(PYTHON) $^ $@
