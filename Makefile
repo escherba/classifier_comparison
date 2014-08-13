@@ -50,11 +50,17 @@ pca: pca.py
 
 extract_topics: topic_extraction.py
 	$(PYTHON) $< \
-		--data_dir $(CORPUS_DIR) \
-		--n_samples 10000 \
+		--n_samples 3000 \
 		--method NMF \
-		--n_topics 10 \
-		--n_features 4000 \
+		--n_topics 25 \
+		--n_features 350 \
+		--input data/2014-01-14.detail.sorted
+
+ap: affinity_propagation.py
+	$(PYTHON) $< \
+		--data_dir $(CORPUS_DIR) \
+		--n_samples 1000 \
+		--n_features 100 \
 		--categories spam
 
 .PRECIOUS: $(PLOT_INTERMEDIATE).roc.png $(PLOT_INTERMEDIATE2).roc.png
