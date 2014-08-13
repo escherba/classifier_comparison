@@ -50,10 +50,11 @@ pca: pca.py
 
 extract_topics: topic_extraction.py
 	$(PYTHON) $< \
-		--n_samples 3000 \
+		--n_samples 5000 \
 		--method NMF \
 		--n_topics 25 \
-		--n_features 350 \
+		--n_features 400 \
+		--ground_tag spam \
 		--input data/2014-01-14.detail.sorted
 
 ap: affinity_propagation.py

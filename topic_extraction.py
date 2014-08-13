@@ -1,20 +1,16 @@
 from __future__ import print_function
 from argparse import ArgumentParser
 
-import colorama
-from colorama import init as colorama_init
-colorama_init()
-
 import json
 
 from itertools import izip, imap
 from time import time
 from scipy import sparse
-#from sklearn.feature_extraction import text
 from utils.lfcorpus import get_data_frame
 from lsh_hdc.stats import safe_div, uncertainty_score
 from pymaptools.iter import take
 from functools import partial
+from collections import defaultdict, Counter
 from utils.feature_extract import FeaturePipeline, TextExtractor, \
     ChiSqBigramFinder
 from sklearn.pipeline import FeatureUnion
@@ -30,18 +26,21 @@ def has_tag(tag, json_obj):
     return tag in imp_tags
 
 
-is_bulk = partial(has_tag, 'bulk')
-is_spam = partial(has_tag, 'spam')
+def get_id(json_obj):
+    return json_obj['object']['post_id']
 
 
 class USumm(object):
     def __init__(self):
         self.categories = []
         self.topics = []
+        self.topic_map = defaultdict(Counter)
+        self.default_pred = '(none)'
 
-    def add(self, obj, topic):
-        self.categories.append(is_spam(obj))
-        self.topics.append(topic)
+    def add(self, obj, label_true, label_pred):
+        self.categories.append(label_true)
+        self.topics.append(label_pred)
+        self.topic_map[label_pred][label_true] += 1
 
     def summarize(self):
         return dict(nmi=NMI_score(self.categories, self.topics),
@@ -57,17 +56,19 @@ op.add_argument("--n_features", default=400, type=int,
                 help="number of features to expect")
 op.add_argument("--n_topics", default=10, type=int,
                 help="number of topics to find")
-op.add_argument("--show_topics", type=int, default=10,
+op.add_argument("--show_topics", action="store_true",
                 help="whether to list topic names")
-op.add_argument("--show_comments", type=int, default=20,
+op.add_argument("--show_comments", action="store_true",
                 help="whether to list comments")
 op.add_argument("--method", default="NMF", type=str, choices=["NMF", "SVD"],
                 help="Decomposition method to use")
+op.add_argument("--ground_tag", default="spam", type=str,
+                choices=["spam", "bulk"], help="Tag to compare to")
 op.add_argument("--n_top_words", default=20, type=int,
                 help="number of top words to print")
 op.add_argument("--categories", nargs="+", type=str,
                 help="Categories (e.g. spam, ham)")
-op.add_argument("--topic_ratio", default=8.0, type=float,
+op.add_argument("--topic_ratio", default=4.0, type=float,
                 help="Ratio by which fisrt topic must be heavier than second")
 op.add_argument("--word_ratio", default=1.33, type=float,
                 help="Ratio by which fisrt word must be heavier than second"
@@ -77,6 +78,7 @@ op.add_argument("--data_dir", type=str, default=None,
 op.add_argument("--input", type=str, default=None,
                 help="input file", required=False)
 
+
 args = op.parse_args()
 if args.method == "NMF":
     from sklearn.decomposition import NMF as Decomposition
@@ -84,6 +86,9 @@ elif args.method == "SVD":
     from sklearn.decomposition import TruncatedSVD as Decomposition
 else:
     op.error("Invalid decomposition method")
+
+
+is_ground_true = partial(has_tag, args.ground_tag)
 
 # Load the 20 newsgroups dataset and vectorize it using the most common word
 # frequency with TF-IDF weighting (without top 5% stop words)
@@ -119,7 +124,7 @@ if args.data_dir is None and args.input is None:
     data = dataset.data[:args.n_samples]
     samples = data
     show_sample = str
-    Y = None
+    # Y = None
 elif args.data_dir is not None and args.input is None:
     if args.categories is not None:
         cat_filter = set(args.categories)
@@ -134,7 +139,7 @@ elif args.data_dir is not None and args.input is None:
     data = dataset.data[:args.n_samples]
     samples = data
     show_sample = str
-    Y = None
+    # Y = None
 else:
     with open(args.input, 'r') as fh:
         dataset = imap(json.loads, fh)
@@ -142,12 +147,13 @@ else:
     content_column = 'content'
     samples = [s['object'] for s in data]
     show_sample = show_mac
-    Y = [is_spam(s) for s in data]
+    # Y = [is_ground_true(s) for s in data]
 
 content_pipeline = FeaturePipeline([
     ('cont1', TextExtractor(content_column)),
     ('vectf', TfidfVectorizer(sublinear_tf=True, max_df=0.3, lowercase=True,
-                              max_features=args.n_features))
+                              max_features=args.n_features, use_idf=True,
+                              stop_words="english", norm='l1'))
 ])
 colloc_pipeline = FeaturePipeline([
     ('cont1', TextExtractor(content_column)),
@@ -156,15 +162,11 @@ colloc_pipeline = FeaturePipeline([
 ])
 preprocess = FeatureUnion([
     ('w', content_pipeline),
-    ('bi', colloc_pipeline)
+    #('bi', colloc_pipeline)
 ])
 
 
-#vectorizer = text.CountVectorizer(max_df=0.95, max_features=args.n_features,
-#                                  lowercase=True, stop_words="english")
-
 tfidf = preprocess.fit_transform(samples)
-#tfidf = text.TfidfTransformer(norm="l2", use_idf=True).fit_transform(counts)
 print("done in %0.3fs." % (time() - t0))
 
 # Fit the model
@@ -191,25 +193,13 @@ for j, topic in enumerate(nmf.components_):
     topic_names.append(topic_name)
 
 
-if args.show_topics is not None:
-    print()
-    print("Topics (showing %d)........" % args.show_topics)
-    print()
-    n = min(args.show_topics, len(topic_names))
-    for i, topic_name in enumerate(take(n, topic_names)):
-        print(i + 1, topic_name)
-
+us = USumm()
 
 if args.show_comments is not None:
     print()
-    print("Comments (%d well-assigned)........" % args.show_comments)
+    print("Comments (well-assigned)........")
     print()
-    n = min(args.show_comments, len(data))
-    comments_shown = 0
-    us = USumm()
     for sample, topics in izip(data, topics_x_comments):
-        if comments_shown > args.show_comments:
-            break
         m = topics.todense()
         found_topics = sorted(((round(m[0, i], 3), name)
                               for i, name in enumerate(topic_names)),
@@ -217,13 +207,25 @@ if args.show_comments is not None:
         topic1, topic2 = found_topics[:2]
         assigned_topic = topic1[1] \
             if safe_div(topic1[0], topic2[0]) >= args.topic_ratio \
-            else None
-        us.add(sample, '(none)')
-        if assigned_topic is not None:
-            us.add(sample, assigned_topic)
-            print(colorama.Fore.WHITE + assigned_topic + ':',
-                  colorama.Fore.RESET + show_sample(sample))
-            print()
-            comments_shown += 1
-    print("NMI coeff: %s" % us.summarize())
+            else us.default_pred
+        us.add(sample, is_ground_true(sample), assigned_topic)
 
+
+table_format = "{: <20} {: <30}"
+if args.show_topics is not None:
+    print()
+    print("Topics (showing %d)........" % args.n_topics)
+    print()
+    ground_map = Counter()
+    for topic_name in topic_names:
+        c = us.topic_map[topic_name]
+        ground_map.update(c)
+        print(table_format.format(topic_name, c.items()))
+
+    c = us.topic_map[us.default_pred]
+    ground_map.update(c)
+    print(table_format.format(us.default_pred, c.items()))
+    print(table_format.format("total", ground_map.items()))
+    print()
+    print("NMI coeff: %s" % us.summarize())
+    print()
