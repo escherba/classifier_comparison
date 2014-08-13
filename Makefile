@@ -50,10 +50,11 @@ pca: pca.py
 
 extract_topics: topic_extraction.py
 	$(PYTHON) $< \
-		--n_samples 5000 \
+		--n_samples 20000 \
 		--method NMF \
-		--n_topics 25 \
-		--n_features 400 \
+		--topic_ratio 3.0 \
+		--n_topics 20 \
+		--n_features 300 \
 		--ground_tag spam \
 		--input data/2014-01-14.detail.sorted
 
