@@ -5,6 +5,10 @@ from __future__ import print_function
 
 from argparse import ArgumentParser
 
+import colorama
+from colorama import init as colorama_init
+colorama_init()
+
 import json
 
 from itertools import izip
@@ -27,8 +31,8 @@ op.add_argument("--n_top_words", default=20, type=int,
                 help="number of top words to print")
 op.add_argument("--categories", nargs="+", type=str,
                 help="Categories (e.g. spam, ham)")
-op.add_argument("--data_dir", type=str,
-                help="data directory", required=True)
+op.add_argument("--data_dir", type=str, default=None,
+                help="data directory", required=False)
 
 args = op.parse_args()
 if args.method == "NMF":
@@ -44,16 +48,35 @@ else:
 t0 = time()
 print("Loading dataset and extracting TF-IDF features...")
 
-if args.categories is not None:
-    cat_filter = set(args.categories)
+if args.data_dir is None:
+    # Load 20 newsgroups corpus
+    print("loading 20 newsgroups corpus")
+    from sklearn.datasets import fetch_20newsgroups
+    if args.categories is None:
+        categories = [
+            'alt.atheism',
+            'talk.religion.misc',
+            'comp.graphics',
+            'sci.space',
+        ]
+    else:
+        categories = args.categories
+    fields_to_remove = ()  # ('headers', 'footers', 'quotes')
+    print("Loading 20 newsgroups dataset for categories:")
+    print(categories if categories else "all")
+    dataset = fetch_20newsgroups(subset='train', categories=categories,
+                                 shuffle=True, random_state=42,
+                                 remove=fields_to_remove)
 else:
-    cat_filter = None
+    if args.categories is not None:
+        cat_filter = set(args.categories)
+    else:
+        cat_filter = None
 
-dataset = get_data_frame(
-    args.data_dir,
-    lambda line: json.loads(line)['content'],
-    cat_filter=cat_filter)
-
+    dataset = get_data_frame(
+        args.data_dir,
+        lambda line: json.loads(line)['content'],
+        cat_filter=cat_filter)
 
 vectorizer = text.CountVectorizer(max_df=0.95, max_features=args.n_features,
                                   lowercase=True, stop_words="english")
@@ -90,6 +113,7 @@ for sample, topics in izip(samples, topics_x_comments):
     m = topics.todense()
     found_topics = sorted([(round(m[0, i], 3), topic_names[i])
                            for i in range(0, num_topics)], reverse=True)
-    if 'health' not in sample and 'health' in found_topics[0][1]:
-        print(sample, found_topics[:3])
-        print()
+    print(colorama.Fore.RESET + sample)
+    print(colorama.Fore.WHITE + ', '.join(ft[1] for ft in found_topics[:3]))
+    print(colorama.Fore.GREEN + str(found_topics[:3]))
+    print()
