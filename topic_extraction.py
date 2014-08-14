@@ -33,11 +33,11 @@ stream_handler.setFormatter(formatter)
 LOG.addHandler(stream_handler)
 
 
-def has_tag(tag, json_obj):
+def has_common_tags(tags, json_obj):
     imp_section = json_obj.get('impermium', {}) or {}
     imp_result = imp_section.get('result', {}) or {}
-    imp_tags = imp_result.get('tag_details', {}) or {}
-    return tag in imp_tags
+    imp_tags = set(imp_result.get('tag_details', {}).keys() or [])
+    return len(tags & imp_tags) > 0
 
 
 def get_id(json_obj):
@@ -62,22 +62,27 @@ class USumm(object):
                     u2=uncertainty_score(self.topics, self.categories))
 
 
+TAG_MAP = dict(
+    profanity={'strong_profanity', 'mild_profanity'},
+    insult={'strong_insult', 'mild_insult'},
+    spam={'spam'},
+    bulk={'bulk'}
+)
+
 # parse commandline arguments
 op = ArgumentParser()
 op.add_argument("--n_samples", default=10000, type=int,
                 help="number of samples to use")
-op.add_argument("--n_features", default=400, type=int,
+op.add_argument("--n_features", default=300, type=int,
                 help="number of features to expect")
-op.add_argument("--n_topics", default=10, type=int,
+op.add_argument("--n_topics", default=20, type=int,
                 help="number of topics to find")
 op.add_argument("--show_topics", action="store_true",
                 help="whether to list topic names")
 op.add_argument("--method", default="NMF", type=str, choices=["NMF", "SVD"],
                 help="Decomposition method to use")
 op.add_argument("--ground_tag", default="spam", type=str,
-                choices=["spam", "bulk", "mild_insult", "strong_insult",
-                         "mild_profanity", "strong_profanity"],
-                help="Tag to compare to")
+                choices=TAG_MAP.keys(), help="Tag set to compare against")
 op.add_argument("--n_top_words", default=20, type=int,
                 help="number of top words to print")
 op.add_argument("--categories", nargs="+", type=str,
@@ -102,8 +107,6 @@ else:
     op.error("Invalid decomposition method")
 
 
-is_ground_true = partial(has_tag, args.ground_tag)
-
 # Load the 20 newsgroups dataset and vectorize it using the most common word
 # frequency with TF-IDF weighting (without top 5% stop words)
 
@@ -111,9 +114,7 @@ t0 = time()
 LOG.info("Loading dataset and extracting TF-IDF features...")
 
 
-def show_mac(obj):
-    return obj['object']['content']
-
+content_column = u'content'
 
 if args.data_dir is None and args.input is None:
     # Load 20 newsgroups corpus
@@ -131,37 +132,37 @@ if args.data_dir is None and args.input is None:
     fields_to_remove = ()  # ('headers', 'footers', 'quotes')
     LOG.info("Loading 20 newsgroups dataset for categories: %s"
              % (categories if categories else "all"))
-    content_column = None
     dataset = fetch_20newsgroups(subset='train', categories=categories,
                                  shuffle=True, random_state=42,
                                  remove=fields_to_remove)
-    data = dataset.data[:args.n_samples]
+    data = []
+    for i in range(0, min(args.n_samples, len(dataset.data))):
+        data.append({content_column: dataset.data[i],
+                     'category': dataset.target[i]})
+    get_ground_truth = lambda o: dataset.target_names[o['category']]
     samples = data
-    show_sample = str
     # Y = None
 elif args.data_dir is not None and args.input is None:
+    get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
     if args.categories is not None:
         cat_filter = set(args.categories)
     else:
         cat_filter = None
 
-    content_column = 'content'
     dataset = get_data_frame(
         args.data_dir,
-        lambda line: json.loads(line)[content_column],
+        lambda line: json.loads(line),
         cat_filter=cat_filter)
     data = dataset.data[:args.n_samples]
     samples = data
-    show_sample = str
     # Y = None
 else:
+    get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
     with open(args.input, 'r') as fh:
         dataset = imap(json.loads, fh)
         data = take(args.n_samples, dataset)
-    content_column = 'content'
     samples = [s['object'] for s in data]
-    show_sample = show_mac
-    # Y = [is_ground_true(s) for s in data]
+    # Y = [get_ground_truth(s) for s in data]
 
 content_pipeline = FeaturePipeline([
     ('cont1', TextExtractor(content_column)),
@@ -176,7 +177,7 @@ colloc_pipeline = FeaturePipeline([
 ])
 preprocess = FeatureUnion([
     ('w', content_pipeline),
-    #('bi', colloc_pipeline)
+    # ('bi', colloc_pipeline)
 ])
 
 
@@ -218,7 +219,7 @@ for sample, topics in izip(data, topics_x_comments):
     assigned_topic = topic1[1] \
         if safe_div(topic1[0], topic2[0]) >= args.topic_ratio \
         else us.default_pred
-    us.add(sample, is_ground_true(sample), assigned_topic)
+    us.add(sample, get_ground_truth(sample), assigned_topic)
 
 
 table_format = "{: <20} {: <30}"
