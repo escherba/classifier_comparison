@@ -33,11 +33,11 @@ stream_handler.setFormatter(formatter)
 LOG.addHandler(stream_handler)
 
 
-def has_tag(tag, json_obj):
+def has_common_tags(tags, json_obj):
     imp_section = json_obj.get('impermium', {}) or {}
     imp_result = imp_section.get('result', {}) or {}
-    imp_tags = imp_result.get('tag_details', {}) or {}
-    return tag in imp_tags
+    imp_tags = set(imp_result.get('tag_details', {}).keys() or [])
+    return len(tags & imp_tags) > 0
 
 
 def get_id(json_obj):
@@ -62,22 +62,27 @@ class USumm(object):
                     u2=uncertainty_score(self.topics, self.categories))
 
 
+TAG_MAP = dict(
+    profanity={'strong_profanity', 'mild_profanity'},
+    insult={'strong_insult', 'mild_insult'},
+    spam={'spam'},
+    bulk={'bulk'}
+)
+
 # parse commandline arguments
 op = ArgumentParser()
 op.add_argument("--n_samples", default=10000, type=int,
                 help="number of samples to use")
-op.add_argument("--n_features", default=400, type=int,
+op.add_argument("--n_features", default=300, type=int,
                 help="number of features to expect")
-op.add_argument("--n_topics", default=10, type=int,
+op.add_argument("--n_topics", default=20, type=int,
                 help="number of topics to find")
 op.add_argument("--show_topics", action="store_true",
                 help="whether to list topic names")
 op.add_argument("--method", default="NMF", type=str, choices=["NMF", "SVD"],
                 help="Decomposition method to use")
 op.add_argument("--ground_tag", default="spam", type=str,
-                choices=["spam", "bulk", "mild_insult", "strong_insult",
-                         "mild_profanity", "strong_profanity"],
-                help="Tag to compare to")
+                choices=TAG_MAP.keys(), help="Tag set to compare against")
 op.add_argument("--n_top_words", default=20, type=int,
                 help="number of top words to print")
 op.add_argument("--categories", nargs="+", type=str,
@@ -138,7 +143,7 @@ if args.data_dir is None and args.input is None:
     samples = data
     # Y = None
 elif args.data_dir is not None and args.input is None:
-    get_ground_truth = partial(has_tag, args.ground_tag)
+    get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
     if args.categories is not None:
         cat_filter = set(args.categories)
     else:
@@ -152,7 +157,7 @@ elif args.data_dir is not None and args.input is None:
     samples = data
     # Y = None
 else:
-    get_ground_truth = partial(has_tag, args.ground_tag)
+    get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
     with open(args.input, 'r') as fh:
         dataset = imap(json.loads, fh)
         data = take(args.n_samples, dataset)
@@ -172,7 +177,7 @@ colloc_pipeline = FeaturePipeline([
 ])
 preprocess = FeatureUnion([
     ('w', content_pipeline),
-    #('bi', colloc_pipeline)
+    # ('bi', colloc_pipeline)
 ])
 
 
