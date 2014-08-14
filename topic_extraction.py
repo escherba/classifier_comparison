@@ -81,8 +81,9 @@ op.add_argument("--show_topics", action="store_true",
                 help="whether to list topic names")
 op.add_argument("--method", default="NMF", type=str, choices=["NMF", "SVD"],
                 help="Decomposition method to use")
-op.add_argument("--ground_tag", default="spam", type=str,
-                choices=TAG_MAP.keys(), help="Tag set to compare against")
+op.add_argument("--ground_tag", default=None, type=str,
+                choices=TAG_MAP.keys(), help="Tag set to compare against"
+                "If None, will rely on user_id for MAC content")
 op.add_argument("--n_top_words", default=20, type=int,
                 help="number of top words to print")
 op.add_argument("--categories", nargs="+", type=str,
@@ -157,7 +158,10 @@ elif args.data_dir is not None and args.input is None:
     samples = data
     # Y = None
 else:
-    get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
+    if args.ground_tag is None:
+        get_ground_truth = lambda o: o['object']['user_id']
+    else:
+        get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
     with open(args.input, 'r') as fh:
         dataset = imap(json.loads, fh)
         data = take(args.n_samples, dataset)
@@ -223,16 +227,19 @@ for sample, topics in izip(data, topics_x_comments):
 
 
 table_format = "{: <20} {: <30}"
-if args.show_topics is not None:
-    ground_map = Counter()
-    for topic_name in topic_names:
-        c = us.topic_map[topic_name]
-        ground_map.update(c)
+ground_map = Counter()
+for topic_name in topic_names:
+    c = us.topic_map[topic_name]
+    ground_map.update(c)
+    if args.show_topics:
         print(table_format.format(topic_name, c.items()))
 
-    c = us.topic_map[us.default_pred]
-    ground_map.update(c)
+c = us.topic_map[us.default_pred]
+ground_map.update(c)
+if args.show_topics:
     print(table_format.format(us.default_pred, c.items()))
     print(table_format.format("total", ground_map.items()))
 
-print(json.dumps(us.summarize()))
+summary = us.summarize()
+summary['coeff'] = args.topic_ratio
+print(json.dumps(summary))
