@@ -52,8 +52,8 @@ extract_topics: topic_extraction.py
 	$(PYTHON) $< \
 		--method NMF \
 		--n_samples 20000 \
-		--n_features 300 \
-		--n_topics 20 \
+		--n_topics 40 \
+		--features_per_topic 3.0 \
 		--topic_ratio 3.0 \
 		--show_topics \
 		--ground_tag spam \
