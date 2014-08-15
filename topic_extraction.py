@@ -245,16 +245,8 @@ for topic_ratio in args.topic_ratio:
             else cs.default_pred
         cs.add(get_ground_truth(sample), assigned_topic)
 
-    # print results
     if args.show_topics:
-        print_table = lambda t, s: print(u"{: <20} {: <30}".format(t, s))
-        print()
-        for topic in topic_names:
-            print_table(topic, cs.summarize_pred(topic, formatted=True))
-        print_table(cs.default_pred, cs.summarize_pred(cs.default_pred,
-                                                       formatted=True))
-        print_table("total", cs.true_counts(formatted=True))
-        print()
+        cs.print_table()
 
     unclust_key = '_unclust'
     summary = cs.summarize()
