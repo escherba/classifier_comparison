@@ -69,3 +69,7 @@ out/
 
 # Data
 corpora/
+
+# Misc
+*.bak
+*.orig

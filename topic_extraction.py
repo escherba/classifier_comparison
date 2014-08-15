@@ -32,15 +32,35 @@ stream_handler.setFormatter(formatter)
 LOG.addHandler(stream_handler)
 
 
-def has_common_tags(tags, json_obj):
+def get_imp(json_obj):
     imp_section = json_obj.get('impermium', {}) or {}
     imp_result = imp_section.get('result', {}) or {}
+    return imp_result
+
+
+def has_common_tags(tags, json_obj):
+    imp_result = get_imp(json_obj)
     imp_tags = set(imp_result.get('tag_details', {}).keys() or [])
     return len(tags & imp_tags) > 0
 
 
+def get_imp_lang(json_obj):
+    imp_result = get_imp(json_obj)
+    return imp_result.get('language')
+
+
+def get_langid_lang(json_obj):
+    langid_section = json_obj.get('langid', {}) or {}
+    langid_result = langid_section.get('result', {}) or {}
+    return langid_result.get('lang')
+
+
 def get_id(json_obj):
     return json_obj['object']['post_id']
+
+
+def get_user(json_obj):
+    return json_obj['object']['user_id']
 
 
 TAG_MAP = dict(
@@ -50,27 +70,33 @@ TAG_MAP = dict(
     bulk={'bulk'}
 )
 
+ATTR_MAP = dict(
+    user=get_user,
+    lang=get_langid_lang
+)
+
 # parse commandline arguments
 op = ArgumentParser()
 op.add_argument("--n_samples", default=20000, type=int,
                 help="number of samples to use")
 op.add_argument("--n_topics", default=40, type=int,
                 help="number of topics to find")
-op.add_argument("--features_per_topic", default=3.0, type=float,
+op.add_argument("--features_per_topic", default=6.0, type=float,
                 help="number of features to per topic")
 op.add_argument("--show_topics", action="store_true",
                 help="whether to list topic names")
 op.add_argument("--method", default="NMF", type=str, choices=["NMF", "SVD"],
                 help="Decomposition method to use")
 op.add_argument("--ground_tag", default=None, type=str,
-                choices=TAG_MAP.keys(), help="Tag set to compare against"
-                "If None, will rely on user_id for MAC content")
+                choices=TAG_MAP.keys(), help="Tag set to compare against")
+op.add_argument("--ground_attr", default="user", type=str,
+                choices=ATTR_MAP.keys(), help="Attribute to compare against")
 op.add_argument("--n_top_words", default=20, type=int,
                 help="number of top words to print")
 op.add_argument("--categories", nargs="+", type=str,
                 help="Categories (e.g. spam, ham)")
-op.add_argument("--topic_ratio", default=4.0, type=float,
-                help="Ratio by which fisrt topic must be heavier than second")
+op.add_argument("--topic_ratio", default=[2.2], type=float, nargs='*',
+                help="Ratio(s) by which 1st topic must be heavier than 2nd")
 op.add_argument("--word_ratio", default=1.618, type=float,
                 help="Ratio by which fisrt word should be heavier than second"
                      "(for labeling topics)")
@@ -138,16 +164,23 @@ elif args.data_dir is not None and args.input is None:
     data = dataset.data[:args.n_samples]
     samples = data
     # Y = None
-else:
-    if args.ground_tag is None:
-        get_ground_truth = lambda o: o['object']['user_id']
-    else:
+
+
+elif args.input is not None:
+    if args.ground_tag is not None:
         get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
+    elif args.ground_attr is not None:
+        get_ground_truth = ATTR_MAP[args.ground_attr]
+    else:
+        raise ValueError("neither ground_tag nor ground_attr specified")
+
     with open(args.input, 'r') as fh:
         dataset = imap(json.loads, fh)
         data = take(args.n_samples, dataset)
     samples = [s['object'] for s in data]
     # Y = [get_ground_truth(s) for s in data]
+else:
+    raise ValueError("No input sources specified.")
 
 n_features = int(ceil(args.n_topics * args.features_per_topic))
 
@@ -196,31 +229,35 @@ for j, topic in enumerate(nmf.components_):
     topic_names.append(topic_name)
 
 
-cs = ClusteringComparator({'ratio': args.topic_ratio})
+for topic_ratio in args.topic_ratio:
+    LOG.info("Generating stats for topic ratio {}".format(topic_ratio))
+    cs = ClusteringComparator({'ratio': topic_ratio})
 
-for sample, topics in izip(data, topics_x_comments):
-    m = topics.todense()
-    found_topics = sorted(((round(m[0, i], 3), name)
-                           for i, name in enumerate(topic_names)),
-                          reverse=True)
-    topic1, topic2 = found_topics[:2]
-    assigned_topic = topic1[1] \
-        if safe_div(topic1[0], topic2[0]) >= args.topic_ratio \
-        else cs.default_pred
-    cs.add(get_ground_truth(sample), assigned_topic)
+    # assign topics to comments
+    for sample, topics in izip(data, topics_x_comments):
+        m = topics.todense()
+        found_topics = sorted(((round(m[0, i], 3), name)
+                              for i, name in enumerate(topic_names)),
+                              reverse=True)
+        topic1, topic2 = found_topics[:2]
+        assigned_topic = topic1[1] \
+            if safe_div(topic1[0], topic2[0]) >= topic_ratio \
+            else cs.default_pred
+        cs.add(get_ground_truth(sample), assigned_topic)
 
-if args.show_topics:
-    table_format = u"{: <20} {: <30}"
-    print()
-    for topic in topic_names:
-        print(table_format.format(topic,
-                                  cs.summarize_pred(topic,
-                                                    formatted=True)))
-    print(table_format.format(cs.default_pred,
-                              cs.summarize_pred(cs.default_pred,
-                                                formatted=True)))
-    print(table_format.format("total", cs.true_counts(formatted=True)))
+    # print results
+    if args.show_topics:
+        print_table = lambda t, s: print(u"{: <20} {: <30}".format(t, s))
+        print()
+        for topic in topic_names:
+            print_table(topic, cs.summarize_pred(topic, formatted=True))
+        print_table(cs.default_pred, cs.summarize_pred(cs.default_pred,
+                                                       formatted=True))
+        print_table("total", cs.true_counts(formatted=True))
+        print()
 
-    print()
-
-print(json.dumps(cs.summarize()))
+    unclust_key = '_unclust'
+    summary = cs.summarize()
+    assert unclust_key not in summary
+    summary[unclust_key] = cs.freq_ratio_pred(cs.default_pred)
+    print(json.dumps(summary))
