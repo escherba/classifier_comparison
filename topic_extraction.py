@@ -5,6 +5,7 @@ import json
 import logging
 
 import sys
+from math import ceil
 from itertools import izip, imap
 from time import time
 from scipy import sparse
@@ -51,12 +52,12 @@ TAG_MAP = dict(
 
 # parse commandline arguments
 op = ArgumentParser()
-op.add_argument("--n_samples", default=10000, type=int,
+op.add_argument("--n_samples", default=20000, type=int,
                 help="number of samples to use")
-op.add_argument("--n_features", default=300, type=int,
-                help="number of features to expect")
-op.add_argument("--n_topics", default=20, type=int,
+op.add_argument("--n_topics", default=40, type=int,
                 help="number of topics to find")
+op.add_argument("--features_per_topic", default=3.0, type=float,
+                help="number of features to per topic")
 op.add_argument("--show_topics", action="store_true",
                 help="whether to list topic names")
 op.add_argument("--method", default="NMF", type=str, choices=["NMF", "SVD"],
@@ -70,8 +71,8 @@ op.add_argument("--categories", nargs="+", type=str,
                 help="Categories (e.g. spam, ham)")
 op.add_argument("--topic_ratio", default=4.0, type=float,
                 help="Ratio by which fisrt topic must be heavier than second")
-op.add_argument("--word_ratio", default=1.33, type=float,
-                help="Ratio by which fisrt word must be heavier than second"
+op.add_argument("--word_ratio", default=1.618, type=float,
+                help="Ratio by which fisrt word should be heavier than second"
                      "(for labeling topics)")
 op.add_argument("--data_dir", type=str, default=None,
                 help="data directory", required=False)
@@ -148,10 +149,12 @@ else:
     samples = [s['object'] for s in data]
     # Y = [get_ground_truth(s) for s in data]
 
+n_features = int(ceil(args.n_topics * args.features_per_topic))
+
 content_pipeline = FeaturePipeline([
     ('cont1', TextExtractor(content_column)),
     ('vectf', TfidfVectorizer(sublinear_tf=True, max_df=0.3, lowercase=True,
-                              max_features=args.n_features, use_idf=True,
+                              max_features=n_features, use_idf=True,
                               stop_words="english", norm='l1'))
 ])
 colloc_pipeline = FeaturePipeline([
@@ -171,7 +174,7 @@ LOG.info("done in %0.3fs." % (time() - t0))
 # Fit the model
 LOG.info("Fitting the %s model with n_samples=%d, n_features=%d, "
          "n_topics=%d..." %
-         (args.method, args.n_samples, args.n_features, args.n_topics))
+         (args.method, args.n_samples, n_features, args.n_topics))
 
 nmf = Decomposition(n_components=args.n_topics).fit(tfidf)
 LOG.info("done in %0.3fs." % (time() - t0))

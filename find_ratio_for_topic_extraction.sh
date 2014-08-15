@@ -7,8 +7,8 @@ do
     python topic_extraction.py \
         --method NMF \
         --n_samples 20000 \
-        --n_features 300 \
         --n_topics 20 \
+        --features_per_topic 3.0 \
         --topic_ratio $ratio \
         --ground_tag spam \
         --input "data/2014-01-14.detail.sorted"
