@@ -9,16 +9,14 @@ from itertools import izip, imap
 from time import time
 from scipy import sparse
 from utils.lfcorpus import get_data_frame
-from lsh_hdc.stats import safe_div, uncertainty_score
+from lsh_hdc.stats import safe_div, ClusteringComparator
 from pymaptools.iter import take
 from functools import partial
-from collections import defaultdict, Counter
 from utils.feature_extract import FeaturePipeline, TextExtractor, \
     ChiSqBigramFinder
 from sklearn.pipeline import FeatureUnion
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import normalized_mutual_info_score as NMI_score
 
 # setup logging
 LOG = logging.getLogger(__name__)
@@ -44,24 +42,6 @@ def get_id(json_obj):
     return json_obj['object']['post_id']
 
 
-class USumm(object):
-    def __init__(self):
-        self.categories = []
-        self.topics = []
-        self.topic_map = defaultdict(Counter)
-        self.default_pred = '(none)'
-
-    def add(self, obj, label_true, label_pred):
-        self.categories.append(label_true)
-        self.topics.append(label_pred)
-        self.topic_map[label_pred][label_true] += 1
-
-    def summarize(self):
-        return dict(nmi=NMI_score(self.categories, self.topics),
-                    u1=uncertainty_score(self.categories, self.topics),
-                    u2=uncertainty_score(self.topics, self.categories))
-
-
 TAG_MAP = dict(
     profanity={'strong_profanity', 'mild_profanity'},
     insult={'strong_insult', 'mild_insult'},
@@ -81,8 +61,9 @@ op.add_argument("--show_topics", action="store_true",
                 help="whether to list topic names")
 op.add_argument("--method", default="NMF", type=str, choices=["NMF", "SVD"],
                 help="Decomposition method to use")
-op.add_argument("--ground_tag", default="spam", type=str,
-                choices=TAG_MAP.keys(), help="Tag set to compare against")
+op.add_argument("--ground_tag", default=None, type=str,
+                choices=TAG_MAP.keys(), help="Tag set to compare against"
+                "If None, will rely on user_id for MAC content")
 op.add_argument("--n_top_words", default=20, type=int,
                 help="number of top words to print")
 op.add_argument("--categories", nargs="+", type=str,
@@ -157,7 +138,10 @@ elif args.data_dir is not None and args.input is None:
     samples = data
     # Y = None
 else:
-    get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
+    if args.ground_tag is None:
+        get_ground_truth = lambda o: o['object']['user_id']
+    else:
+        get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
     with open(args.input, 'r') as fh:
         dataset = imap(json.loads, fh)
         data = take(args.n_samples, dataset)
@@ -208,7 +192,7 @@ for j, topic in enumerate(nmf.components_):
     topic_names.append(topic_name)
 
 
-us = USumm()
+cs = ClusteringComparator({'ratio': args.topic_ratio})
 
 for sample, topics in izip(data, topics_x_comments):
     m = topics.todense()
@@ -218,21 +202,23 @@ for sample, topics in izip(data, topics_x_comments):
     topic1, topic2 = found_topics[:2]
     assigned_topic = topic1[1] \
         if safe_div(topic1[0], topic2[0]) >= args.topic_ratio \
-        else us.default_pred
-    us.add(sample, get_ground_truth(sample), assigned_topic)
+        else cs.default_pred
+    cs.add(get_ground_truth(sample), assigned_topic)
 
 
 table_format = "{: <20} {: <30}"
-if args.show_topics is not None:
-    ground_map = Counter()
-    for topic_name in topic_names:
-        c = us.topic_map[topic_name]
-        ground_map.update(c)
-        print(table_format.format(topic_name, c.items()))
+if args.show_topics:
+    for topic in topic_names:
+        print(table_format.format(topic,
+                                  cs.summarize_pred(topic,
+                                                    formatted=True)))
 
-    c = us.topic_map[us.default_pred]
-    ground_map.update(c)
-    print(table_format.format(us.default_pred, c.items()))
-    print(table_format.format("total", ground_map.items()))
+if args.show_topics:
+    print(table_format.format(cs.default_pred,
+                              cs.summarize_pred(cs.default_pred,
+                                                formatted=True)))
+    print(table_format.format("total", cs.true_counts(formatted=True)))
 
-print(json.dumps(us.summarize()))
+print()
+print(json.dumps(cs.summarize()))
+print()
