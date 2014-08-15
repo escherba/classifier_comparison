@@ -10,5 +10,8 @@ do
         --n_features 300 \
         --n_topics 20 \
         --topic_ratio $ratio \
+        --ground_tag spam \
         --input "data/2014-01-14.detail.sorted"
-done | json2csv -k coeff,nmi,u1,u2 > user_curve_NMF.csv
+done > spam_cluster_metrics.json
+
+#| json2csv -k _ratio,nmi,us,us_inv > user_curve_NMF.csv

@@ -9,16 +9,14 @@ from itertools import izip, imap
 from time import time
 from scipy import sparse
 from utils.lfcorpus import get_data_frame
-from lsh_hdc.stats import safe_div, uncertainty_score
+from lsh_hdc.stats import safe_div, ClusteringComparator
 from pymaptools.iter import take
 from functools import partial
-from collections import defaultdict, Counter
 from utils.feature_extract import FeaturePipeline, TextExtractor, \
     ChiSqBigramFinder
 from sklearn.pipeline import FeatureUnion
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics import normalized_mutual_info_score as NMI_score
 
 # setup logging
 LOG = logging.getLogger(__name__)
@@ -42,24 +40,6 @@ def has_common_tags(tags, json_obj):
 
 def get_id(json_obj):
     return json_obj['object']['post_id']
-
-
-class USumm(object):
-    def __init__(self):
-        self.categories = []
-        self.topics = []
-        self.topic_map = defaultdict(Counter)
-        self.default_pred = '(none)'
-
-    def add(self, obj, label_true, label_pred):
-        self.categories.append(label_true)
-        self.topics.append(label_pred)
-        self.topic_map[label_pred][label_true] += 1
-
-    def summarize(self):
-        return dict(nmi=NMI_score(self.categories, self.topics),
-                    u1=uncertainty_score(self.categories, self.topics),
-                    u2=uncertainty_score(self.topics, self.categories))
 
 
 TAG_MAP = dict(
@@ -212,7 +192,7 @@ for j, topic in enumerate(nmf.components_):
     topic_names.append(topic_name)
 
 
-us = USumm()
+cs = ClusteringComparator({'ratio': args.topic_ratio})
 
 for sample, topics in izip(data, topics_x_comments):
     m = topics.todense()
@@ -222,24 +202,23 @@ for sample, topics in izip(data, topics_x_comments):
     topic1, topic2 = found_topics[:2]
     assigned_topic = topic1[1] \
         if safe_div(topic1[0], topic2[0]) >= args.topic_ratio \
-        else us.default_pred
-    us.add(sample, get_ground_truth(sample), assigned_topic)
+        else cs.default_pred
+    cs.add(get_ground_truth(sample), assigned_topic)
 
 
 table_format = "{: <20} {: <30}"
-ground_map = Counter()
-for topic_name in topic_names:
-    c = us.topic_map[topic_name]
-    ground_map.update(c)
-    if args.show_topics:
-        print(table_format.format(topic_name, c.items()))
-
-c = us.topic_map[us.default_pred]
-ground_map.update(c)
 if args.show_topics:
-    print(table_format.format(us.default_pred, c.items()))
-    print(table_format.format("total", ground_map.items()))
+    for topic in topic_names:
+        print(table_format.format(topic,
+                                  cs.summarize_pred(topic,
+                                                    formatted=True)))
 
-summary = us.summarize()
-summary['coeff'] = args.topic_ratio
-print(json.dumps(summary))
+if args.show_topics:
+    print(table_format.format(cs.default_pred,
+                              cs.summarize_pred(cs.default_pred,
+                                                formatted=True)))
+    print(table_format.format("total", cs.true_counts(formatted=True)))
+
+print()
+print(json.dumps(cs.summarize()))
+print()
