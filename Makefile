@@ -53,7 +53,7 @@ extract_topics: topic_extraction.py
 		--method NMF \
 		--n_samples 20000 \
 		--n_topics 40 \
-		--topic_ratio `seq 1.0 0.2 6.0` \
+		--topic_ratio 2.2 \
 		--show_topics \
 		--ground_tag spam \
 		--input data/2014-01-14.detail.sorted
