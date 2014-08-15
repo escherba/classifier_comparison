@@ -205,20 +205,18 @@ for sample, topics in izip(data, topics_x_comments):
         else cs.default_pred
     cs.add(get_ground_truth(sample), assigned_topic)
 
-
-table_format = "{: <20} {: <30}"
 if args.show_topics:
+    table_format = "{: <20} {: <30}"
+    print()
     for topic in topic_names:
         print(table_format.format(topic,
                                   cs.summarize_pred(topic,
                                                     formatted=True)))
-
-if args.show_topics:
     print(table_format.format(cs.default_pred,
                               cs.summarize_pred(cs.default_pred,
                                                 formatted=True)))
     print(table_format.format("total", cs.true_counts(formatted=True)))
 
-print()
+    print()
+
 print(json.dumps(cs.summarize()))
-print()
