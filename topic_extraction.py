@@ -169,8 +169,9 @@ tfidf = preprocess.fit_transform(samples)
 LOG.info("done in %0.3fs." % (time() - t0))
 
 # Fit the model
-LOG.info("Fitting the %s model on with n_samples=%d and n_features=%d..." %
-         (args.method, args.n_samples, args.n_features))
+LOG.info("Fitting the %s model with n_samples=%d, n_features=%d, "
+         "n_topics=%d..." %
+         (args.method, args.n_samples, args.n_features, args.n_topics))
 
 nmf = Decomposition(n_components=args.n_topics).fit(tfidf)
 LOG.info("done in %0.3fs." % (time() - t0))
@@ -206,7 +207,7 @@ for sample, topics in izip(data, topics_x_comments):
     cs.add(get_ground_truth(sample), assigned_topic)
 
 if args.show_topics:
-    table_format = "{: <20} {: <30}"
+    table_format = u"{: <20} {: <30}"
     print()
     for topic in topic_names:
         print(table_format.format(topic,
