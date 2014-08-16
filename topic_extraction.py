@@ -5,7 +5,7 @@ import json
 import logging
 
 import sys
-from math import ceil
+from math import ceil, floor
 from itertools import izip, imap
 from time import time
 from scipy import sparse
@@ -13,10 +13,8 @@ from utils.lfcorpus import get_data_frame
 from lsh_hdc.stats import safe_div, ClusteringComparator
 from pymaptools.iter import take
 from functools import partial
-from utils.feature_extract import FeaturePipeline, TextExtractor, \
-    ChiSqBigramFinder
+from utils.feature_extract import FeaturePipeline, TextExtractor
 from sklearn.pipeline import FeatureUnion
-from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 # setup logging
@@ -77,10 +75,12 @@ ATTR_MAP = dict(
 
 # parse commandline arguments
 op = ArgumentParser()
-op.add_argument("--n_samples", default=20000, type=int,
+op.add_argument("--n_samples", default=None, type=int,
                 help="number of samples to use")
-op.add_argument("--n_topics", default=40, type=int,
+op.add_argument("--n_topics", default=None, type=int,
                 help="number of topics to find")
+op.add_argument("--samples_per_topic", default=500.0, type=float,
+                help="number of topics per sample")
 op.add_argument("--features_per_topic", default=6.0, type=float,
                 help="number of features to per topic")
 op.add_argument("--show_topics", action="store_true",
@@ -93,7 +93,7 @@ op.add_argument("--ground_attr", default="user", type=str,
                 choices=ATTR_MAP.keys(), help="Attribute to compare against")
 op.add_argument("--n_top_words", default=20, type=int,
                 help="number of top words to print")
-op.add_argument("--categories", nargs="+", type=str,
+op.add_argument("--categories", nargs="+", type=str, default=None,
                 help="Categories (e.g. spam, ham)")
 op.add_argument("--topic_ratio", default=[2.2], type=float, nargs='*',
                 help="Ratio(s) by which 1st topic must be heavier than 2nd")
@@ -124,19 +124,28 @@ LOG.info("Loading dataset and extracting TF-IDF features...")
 
 content_column = u'content'
 
+n_samples = args.n_samples \
+    if args.n_samples is not None \
+    else float('inf')
+
+n_topics = args.n_topics
+categories = args.categories
+
 if args.data_dir is None and args.input is None:
     # Load 20 newsgroups corpus
     LOG.info("loading 20 newsgroups corpus")
     from sklearn.datasets import fetch_20newsgroups
-    if args.categories is None:
+    if categories is None:
         categories = [
             'alt.atheism',
             'talk.religion.misc',
             'comp.graphics',
             'sci.space',
         ]
-    else:
-        categories = args.categories
+
+    if n_topics is None:
+        n_topics = len(categories)
+
     fields_to_remove = ()  # ('headers', 'footers', 'quotes')
     LOG.info("Loading 20 newsgroups dataset for categories: %s"
              % (categories if categories else "all"))
@@ -144,7 +153,7 @@ if args.data_dir is None and args.input is None:
                                  shuffle=True, random_state=42,
                                  remove=fields_to_remove)
     data = []
-    for i in range(0, min(args.n_samples, len(dataset.data))):
+    for i in range(0, min(n_samples, len(dataset.data))):
         data.append({content_column: dataset.data[i],
                      'category': dataset.target[i]})
     get_ground_truth = lambda o: dataset.target_names[o['category']]
@@ -152,8 +161,10 @@ if args.data_dir is None and args.input is None:
     # Y = None
 elif args.data_dir is not None and args.input is None:
     get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
-    if args.categories is not None:
-        cat_filter = set(args.categories)
+    if categories is not None:
+        cat_filter = set(categories)
+        if n_topics is None:
+            n_topics = len(categories)
     else:
         cat_filter = None
 
@@ -161,7 +172,8 @@ elif args.data_dir is not None and args.input is None:
         args.data_dir,
         lambda line: json.loads(line),
         cat_filter=cat_filter)
-    data = dataset.data[:args.n_samples]
+    data = dataset.data[:n_samples]
+
     samples = data
     # Y = None
 
@@ -176,13 +188,21 @@ elif args.input is not None:
 
     with open(args.input, 'r') as fh:
         dataset = imap(json.loads, fh)
-        data = take(args.n_samples, dataset)
+        data = take(n_samples, dataset)
     samples = [s['object'] for s in data]
     # Y = [get_ground_truth(s) for s in data]
 else:
     raise ValueError("No input sources specified.")
 
-n_features = int(ceil(args.n_topics * args.features_per_topic))
+
+if n_samples == float('inf'):
+    n_samples = len(data)
+
+if n_topics is None:
+    n_topics = int(floor(float(n_samples) / max(2.0, args.samples_per_topic)))
+
+n_features = int(ceil(n_topics * args.features_per_topic))
+
 
 content_pipeline = FeaturePipeline([
     ('cont1', TextExtractor(content_column)),
@@ -190,26 +210,18 @@ content_pipeline = FeaturePipeline([
                               max_features=n_features, use_idf=True,
                               stop_words="english", norm='l1'))
 ])
-colloc_pipeline = FeaturePipeline([
-    ('cont1', TextExtractor(content_column)),
-    ('coll', ChiSqBigramFinder(score_thr=50)),
-    ('vectc', DictVectorizer()),
-])
 preprocess = FeatureUnion([
     ('w', content_pipeline),
-    # ('bi', colloc_pipeline)
 ])
-
 
 tfidf = preprocess.fit_transform(samples)
 LOG.info("done in %0.3fs." % (time() - t0))
 
 # Fit the model
-LOG.info("Fitting the %s model with n_samples=%d, n_features=%d, "
-         "n_topics=%d..." %
-         (args.method, args.n_samples, n_features, args.n_topics))
+LOG.info("Fitting {} model with n_samples={}, n_features={}, n_topics={}..."
+         .format(args.method, n_samples, n_features, n_topics))
 
-nmf = Decomposition(n_components=args.n_topics).fit(tfidf)
+nmf = Decomposition(n_components=n_topics).fit(tfidf)
 LOG.info("done in %0.3fs." % (time() - t0))
 
 sparse_nmf = sparse.csr_matrix(nmf.components_)

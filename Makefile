@@ -52,7 +52,6 @@ extract_topics: topic_extraction.py
 	$(PYTHON) $< \
 		--method NMF \
 		--n_samples 20000 \
-		--n_topics 40 \
 		--topic_ratio 2.2 \
 		--show_topics \
 		--ground_tag spam \
