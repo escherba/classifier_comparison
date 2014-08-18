@@ -1,22 +1,19 @@
-from __future__ import print_function
 from argparse import ArgumentParser
 
 import json
 import logging
 
 import sys
-from math import ceil
 from itertools import izip, imap
 from time import time
-from scipy import sparse
 from utils.lfcorpus import get_data_frame
 from lsh_hdc.stats import safe_div, ClusteringComparator
 from pymaptools.iter import take
 from functools import partial
-from utils.feature_extract import FeaturePipeline, TextExtractor, \
-    ChiSqBigramFinder
+from utils.feature_extract import FeaturePipeline, TextExtractor
+import numpy as np
+from scipy.sparse.csr import csr_matrix
 from sklearn.pipeline import FeatureUnion
-from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 # setup logging
@@ -72,30 +69,51 @@ TAG_MAP = dict(
 
 ATTR_MAP = dict(
     user=get_user,
-    lang=get_langid_lang
+    lang=get_langid_lang,
+    lang_imp=get_imp_lang
 )
 
 # parse commandline arguments
 op = ArgumentParser()
-op.add_argument("--n_samples", default=20000, type=int,
+op.add_argument("--n_samples", default=None, type=int,
                 help="number of samples to use")
-op.add_argument("--n_topics", default=40, type=int,
+op.add_argument("--n_topics", default=None, type=int,
+                help="number of topics to find")
+op.add_argument("--n_features", default=None, type=int,
                 help="number of topics to find")
 op.add_argument("--features_per_topic", default=6.0, type=float,
-                help="number of features to per topic")
+                help="number of features per topic")
 op.add_argument("--show_topics", action="store_true",
                 help="whether to list topic names")
+op.add_argument("--show_top_words", type=int, required=False,
+                help="how many top words to list for each topic")
 op.add_argument("--method", default="NMF", type=str, choices=["NMF", "SVD"],
                 help="Decomposition method to use")
+op.add_argument("--nmf_max_iter", default=400, type=int, required=False,
+                help="maximum number of iterations for NMF")
+op.add_argument("--nmf_beta", default=1.0, type=float, required=False,
+                help="Degree of sparseness, if sparseness is not None. "
+                "Larger values mean more sparseness.")
+op.add_argument("--nmf_eta", default=0.1, type=float, required=False,
+                help="Degree of correctness to maintain, if sparsity set. "
+                "Smaller values mean larger error.")
+op.add_argument("--nmf_sparseness", default=None, type=str, required=False,
+                choices=["data", "components"],
+                help="Where to enforce sparsity in the model")
+op.add_argument("--nmf_nls_max_iter", default=4000, type=int, required=False,
+                help="maximum number of iterations for NMF NLS subproblem")
+op.add_argument("--nmf_init", default="nndsvd", type=str,
+                choices=["nndsvd", "nndsvda", "nndsvdar", "random"],
+                help="Initialization method for NMF")
+op.add_argument("--H_matrix", default="multiply", type=str, required=False,
+                choices=["standard", "multiply"], help="H_matrix algorithm")
 op.add_argument("--ground_tag", default=None, type=str,
                 choices=TAG_MAP.keys(), help="Tag set to compare against")
 op.add_argument("--ground_attr", default="user", type=str,
                 choices=ATTR_MAP.keys(), help="Attribute to compare against")
-op.add_argument("--n_top_words", default=20, type=int,
-                help="number of top words to print")
-op.add_argument("--categories", nargs="+", type=str,
+op.add_argument("--categories", nargs="+", type=str, default=None,
                 help="Categories (e.g. spam, ham)")
-op.add_argument("--topic_ratio", default=[2.2], type=float, nargs='*',
+op.add_argument("--topic_ratio", default=[2.2], type=float, nargs='+',
                 help="Ratio(s) by which 1st topic must be heavier than 2nd")
 op.add_argument("--word_ratio", default=1.618, type=float,
                 help="Ratio by which fisrt word should be heavier than second"
@@ -118,25 +136,33 @@ else:
 # Load the 20 newsgroups dataset and vectorize it using the most common word
 # frequency with TF-IDF weighting (without top 5% stop words)
 
-t0 = time()
-LOG.info("Loading dataset and extracting TF-IDF features...")
-
-
 content_column = u'content'
+
+n_samples = args.n_samples \
+    if args.n_samples is not None \
+    else float('inf')
+
+n_topics = args.n_topics
+categories = args.categories
+
+t0 = time()
+LOG.info("Loading dataset...")
 
 if args.data_dir is None and args.input is None:
     # Load 20 newsgroups corpus
     LOG.info("loading 20 newsgroups corpus")
     from sklearn.datasets import fetch_20newsgroups
-    if args.categories is None:
+    if categories is None:
         categories = [
             'alt.atheism',
             'talk.religion.misc',
             'comp.graphics',
             'sci.space',
         ]
-    else:
-        categories = args.categories
+
+    if n_topics is None:
+        n_topics = len(categories)
+
     fields_to_remove = ()  # ('headers', 'footers', 'quotes')
     LOG.info("Loading 20 newsgroups dataset for categories: %s"
              % (categories if categories else "all"))
@@ -144,16 +170,18 @@ if args.data_dir is None and args.input is None:
                                  shuffle=True, random_state=42,
                                  remove=fields_to_remove)
     data = []
-    for i in range(0, min(args.n_samples, len(dataset.data))):
+    for i in range(0, min(n_samples, len(dataset.data))):
         data.append({content_column: dataset.data[i],
                      'category': dataset.target[i]})
     get_ground_truth = lambda o: dataset.target_names[o['category']]
     samples = data
-    # Y = None
+
 elif args.data_dir is not None and args.input is None:
     get_ground_truth = partial(has_common_tags, TAG_MAP[args.ground_tag])
-    if args.categories is not None:
-        cat_filter = set(args.categories)
+    if categories is not None:
+        cat_filter = set(categories)
+        if n_topics is None:
+            n_topics = len(categories)
     else:
         cat_filter = None
 
@@ -161,10 +189,9 @@ elif args.data_dir is not None and args.input is None:
         args.data_dir,
         lambda line: json.loads(line),
         cat_filter=cat_filter)
-    data = dataset.data[:args.n_samples]
-    samples = data
-    # Y = None
+    data = dataset.data[:n_samples]
 
+    samples = data
 
 elif args.input is not None:
     if args.ground_tag is not None:
@@ -176,13 +203,25 @@ elif args.input is not None:
 
     with open(args.input, 'r') as fh:
         dataset = imap(json.loads, fh)
-        data = take(args.n_samples, dataset)
+        data = take(n_samples, dataset)
     samples = [s['object'] for s in data]
-    # Y = [get_ground_truth(s) for s in data]
+
 else:
     raise ValueError("No input sources specified.")
 
-n_features = int(ceil(args.n_topics * args.features_per_topic))
+
+if n_samples == float('inf'):
+    n_samples = len(data)
+    assert n_samples >= 2
+
+if n_topics is None:
+    n_topics = 2
+
+if args.n_features is None:
+    n_features = n_topics + 1
+else:
+    n_features = args.n_features
+
 
 content_pipeline = FeaturePipeline([
     ('cont1', TextExtractor(content_column)),
@@ -190,66 +229,99 @@ content_pipeline = FeaturePipeline([
                               max_features=n_features, use_idf=True,
                               stop_words="english", norm='l1'))
 ])
-colloc_pipeline = FeaturePipeline([
-    ('cont1', TextExtractor(content_column)),
-    ('coll', ChiSqBigramFinder(score_thr=50)),
-    ('vectc', DictVectorizer()),
-])
 preprocess = FeatureUnion([
     ('w', content_pipeline),
-    # ('bi', colloc_pipeline)
 ])
 
+LOG.info("done in %0.3fs." % (time() - t0))
 
+LOG.info("Extracting TF-IDF features...")
 tfidf = preprocess.fit_transform(samples)
 LOG.info("done in %0.3fs." % (time() - t0))
 
-# Fit the model
-LOG.info("Fitting the %s model with n_samples=%d, n_features=%d, "
-         "n_topics=%d..." %
-         (args.method, args.n_samples, n_features, args.n_topics))
+opts = dict(n_components=n_topics)
+if args.method == "NMF":
+    opts['init'] = args.nmf_init
+    opts['max_iter'] = args.nmf_max_iter
+    opts['nls_max_iter'] = args.nmf_nls_max_iter
+    opts['sparseness'] = args.nmf_sparseness
+    opts['beta'] = args.nmf_beta
+    opts['eta'] = args.nmf_eta
 
-nmf = Decomposition(n_components=args.n_topics).fit(tfidf)
+# Fit the model
+LOG.info("Fitting {} model with n_samples={}, n_features={}, opts={}..."
+         .format(args.method, n_samples, n_features, opts))
+
+nmf_model = Decomposition(**opts)
+
+if args.H_matrix == 'multiply':
+    LOG.info("Obtaining H matrix by multiplying W by tfidf matrix ({})"
+             .format(args.H_matrix))
+    nmf_model.fit(tfidf)
+    W_matrix = nmf_model.components_
+    sparse_H = tfidf.dot(csr_matrix(W_matrix).transpose())
+    H_matrix = np.asarray(sparse_H.todense())
+else:
+    LOG.info("Using provided H matrix ({})".format(args.H_matrix))
+    H_matrix = nmf_model.fit_transform(tfidf)
+    W_matrix = nmf_model.components_
+
+reconstruction_err = nmf_model.reconstruction_err_
+
 LOG.info("done in %0.3fs." % (time() - t0))
 
-sparse_nmf = sparse.csr_matrix(nmf.components_)
-topics_x_comments = tfidf.dot(sparse_nmf.transpose())
-
+LOG.info("Labeling topics...")
 feature_names = preprocess.get_feature_names()
 
 topic_names = []
-for j, topic in enumerate(nmf.components_):
+max_words = max(2, args.show_top_words) \
+    if args.show_top_words is not None \
+    else 2
+
+for j, topic in enumerate(W_matrix):
     weight_words = [(topic[i], feature_names[i])
-                    for i in topic.argsort()[:-args.n_top_words - 1:-1]]
+                    for i in topic.argsort()[:-max_words - 1:-1]]
     word1, word2 = weight_words[:2]
     prefix = str(j) + '_'
     topic_name = prefix + word1[1] \
-        if safe_div(word1[0], word2[0]) >= args.word_ratio \
+        if safe_div(abs(word1[0]), abs(word2[0])) >= args.word_ratio \
         else prefix + word1[1] + '-' + word2[1]
     topic_names.append(topic_name)
+    if args.show_top_words is not None:
+        print topic_name, u' '. join(ww[1] for ww in weight_words)
 
 
+LOG.info("done in %0.3fs." % (time() - t0))
+
+LOG.info("Aggregating stats...")
 for topic_ratio in args.topic_ratio:
-    LOG.info("Generating stats for topic ratio {}".format(topic_ratio))
-    cs = ClusteringComparator({'ratio': topic_ratio})
+    LOG.info("Aggregating stats for topic ratio {}".format(topic_ratio))
+    cs = ClusteringComparator({'ratio': topic_ratio,
+                               'reconstruction_err': reconstruction_err})
 
     # assign topics to comments
-    for sample, topics in izip(data, topics_x_comments):
-        m = topics.todense()
-        found_topics = sorted(((round(m[0, i], 3), name)
-                              for i, name in enumerate(topic_names)),
-                              reverse=True)
-        topic1, topic2 = found_topics[:2]
-        assigned_topic = topic1[1] \
-            if safe_div(topic1[0], topic2[0]) >= topic_ratio \
-            else cs.default_pred
+    for sample, topics in izip(data, H_matrix):
+        top_topics = [(topics[i], topic_names[i])
+                      for i in topics.argsort()[:-3:-1]]
+        if len(top_topics) > 1:
+            topic1, topic2 = top_topics
+            assigned_topic = topic1[1] \
+                if safe_div(abs(topic1[0]), abs(topic2[0])) >= topic_ratio \
+                else cs.default_pred
+        else:
+            assigned_topic = top_topics[0][1]
         cs.add(get_ground_truth(sample), assigned_topic)
 
     if args.show_topics:
-        cs.print_table()
+        print cs.cross_tab(row_order=-1, pct=True)
 
     unclust_key = '_unclust'
     summary = cs.summarize()
     assert unclust_key not in summary
     summary[unclust_key] = cs.freq_ratio_pred(cs.default_pred)
-    print(json.dumps(summary))
+    print json.dumps(summary)
+
+    if args.show_topics:
+        print
+
+LOG.info("done in %0.3fs." % (time() - t0))
