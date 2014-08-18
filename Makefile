@@ -51,11 +51,13 @@ pca: pca.py
 extract_topics: topic_extraction.py
 	$(PYTHON) $< \
 		--method NMF \
-		--n_samples 20000 \
-		--topic_ratio 2.2 \
-		--show_topics \
+		--n_samples 320000 \
+		--n_topics 2 \
+		--topic_ratio 3.0 \
+		--H_matrix multiply \
 		--ground_tag spam \
-		--input data/2014-01-14.detail.sorted
+		--show_topics \
+		--input data/2014-01-24.detail.sorted
 
 ap: affinity_propagation.py
 	$(PYTHON) $< \
