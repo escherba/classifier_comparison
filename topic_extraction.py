@@ -7,7 +7,7 @@ import sys
 from itertools import izip, imap
 from time import time
 from utils.lfcorpus import get_data_frame
-from lsh_hdc.stats import safe_div, ClusteringComparator
+from lflearn.metrics import safe_div, ClusteringComparator
 from pymaptools.iter import take
 from functools import partial
 from utils.feature_extract import FeaturePipeline, TextExtractor
