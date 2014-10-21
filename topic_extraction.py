@@ -10,7 +10,7 @@ from utils.lfcorpus import get_data_frame
 from lsh_hdc.stats import safe_div, ClusteringComparator
 from pymaptools.iter import take
 from functools import partial
-from utils.feature_extract import FeaturePipeline, TextExtractor
+from lflearn.feature_extract import FeaturePipeline, TextExtractor
 import numpy as np
 from scipy.sparse.csr import csr_matrix
 from sklearn.pipeline import FeatureUnion

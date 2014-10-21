@@ -37,7 +37,7 @@ from sklearn.decomposition import TruncatedSVD
 
 from utils import to_csv, split_num
 from utils.lfcorpus import get_data_frame, get_data_frames
-from utils.feature_extract import with_l1_feature_selection, TextExtractor, \
+from lflearn.feature_extract import with_l1_feature_selection, TextExtractor, \
     FeaturePipeline, PCAPipeline, ChiSqBigramFinder
 
 # Display progress logs on stdout

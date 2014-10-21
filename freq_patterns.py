@@ -5,7 +5,7 @@ from operator import itemgetter
 from os.path import isdir
 from itertools import imap
 from argparse import ArgumentParser
-from lsh_hdc.utils import HTMLNormalizer, RegexTokenizer
+from lflearn.feature_extract import HTMLNormalizer, RegexTokenizer
 from nltk.corpus import stopwords
 from fp_growth import find_frequent_itemsets
 

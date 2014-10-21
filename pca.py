@@ -11,7 +11,7 @@ from sklearn.pipeline import FeatureUnion
 from sklearn.feature_extraction.text import TfidfVectorizer, HashingVectorizer
 
 from utils.lfcorpus import get_data_frame
-from utils.feature_extract import TextExtractor, FeaturePipeline
+from lflearn.feature_extract import TextExtractor, FeaturePipeline
 
 
 # Display progress logs on stdout

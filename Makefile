@@ -12,7 +12,7 @@ PLOT_INTERMEDIATE=$(OUTPUT)/fit_metrics
 PLOT_INTERMEDIATE2=$(OUTPUT)/fit_metrics_time
 
 env: requirements.txt
-	test -d env || virtualenv --no-site-packages env
+	test -f env/bin/activate || virtualenv --no-site-packages env
 	$(PYENV) pip install --process-dependency-links -r requirements.txt
 	$(PYENV) pip install matplotlib
 	$(PYENV) easy_install ipython
@@ -57,7 +57,7 @@ extract_topics: topic_extraction.py
 		--H_matrix multiply \
 		--ground_tag spam \
 		--show_topics \
-		--input data/2014-01-24.detail.sorted
+		--input data/2014-01-14.detail.sorted
 
 ap: affinity_propagation.py
 	$(PYTHON) $< \
@@ -75,7 +75,7 @@ ap: affinity_propagation.py
 	$(PYTHON) $^ $@
 
 .PRECIOUS: $(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores
-$(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py
+$(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores: %: classify.py utils/lfcorpus.py
 	$(PYTHON) $< \
 		--data_dir $(CORPUS_DIR) \
 		--vectorizer tfidf \
@@ -87,7 +87,7 @@ $(PLOT_INTERMEDIATE).roc $(PLOT_INTERMEDIATE).scores: %: classify.py utils/featu
 
 
 .PRECIOUS: $(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores
-$(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores: %: classify.py utils/feature_extract.py utils/lfcorpus.py
+$(PLOT_INTERMEDIATE2).roc $(PLOT_INTERMEDIATE2).scores: %: classify.py utils/lfcorpus.py
 	$(PYTHON) $< \
 		--top_terms 100 \
 		--vectorizer tfidf \

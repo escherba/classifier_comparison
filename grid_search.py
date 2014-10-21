@@ -22,7 +22,7 @@ from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.preprocessing import Normalizer
 
 from utils.lfcorpus import get_data_frame
-from utils.feature_extract import TextExtractor, FeatureLang, \
+from lflearn.feature_extract import TextExtractor, FeatureLang, \
     LengthVectorizer, FeaturePipeline
 
 import nltk

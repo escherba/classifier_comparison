@@ -43,7 +43,7 @@ coverage.xml
 .pydevproject
 
 # Rope
-.ropeproject
+.ropeproject/
 
 # Django stuff:
 *.log
