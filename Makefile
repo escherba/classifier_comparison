@@ -79,7 +79,7 @@ ap: affinity_propagation.py
 
 .PRECIOUS: $(PLOT_INTERMEDIATE).roc.png $(PLOT_INTERMEDIATE2).roc.png
 %.roc.png: %.roc
-	$(PYTHON) plot_roc.py --input $^ --output $@
+	$(PYTHON) plot_roc.py --roc_xmax 0.1 --input $^ --output $@
 
 .PRECIOUS: $(PLOT_INTERMEDIATE).scores.png $(PLOT_INTERMEDIATE2).scores.png
 %.scores.png: plot_scores.py %.scores
