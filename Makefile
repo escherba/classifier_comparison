@@ -11,10 +11,21 @@ OUTPUT=out
 PLOT_INTERMEDIATE=$(OUTPUT)/fit_metrics
 PLOT_INTERMEDIATE2=$(OUTPUT)/fit_metrics_time
 
+# Without options below, Mac builds will attempt to use GCC which fails to
+# produce correct compiles with some recent versions of scipy
+ifeq ($(shell uname -s), Darwin)
+export CC=clang
+export CXX="clang++ -stdlib=libstdc++ -I/usr/include/c++/4.2.1"
+export FFLAGS=-ff2c
+else
+# There is bug/weird behavior in virtualenv in Ubuntu that breaks finding the
+# include path. This fixes it and let's Python find Python.h while compiling numpy.
+export C_INCLUDE_PATH=/usr/include/python2.7
+endif
+
 env: requirements.txt
 	test -f env/bin/activate || virtualenv --no-site-packages env
-	$(PYENV) pip install --process-dependency-links -r requirements.txt
-	$(PYENV) pip install matplotlib
+	$(PYENV) pip install -r requirements.txt
 	$(PYENV) easy_install ipython
 	mkdir -p $(OUTPUT)
 
@@ -67,8 +78,8 @@ ap: affinity_propagation.py
 		--categories spam
 
 .PRECIOUS: $(PLOT_INTERMEDIATE).roc.png $(PLOT_INTERMEDIATE2).roc.png
-%.roc.png: plot_roc.py %.roc
-	$(PYTHON) $^ $@
+%.roc.png: %.roc
+	$(PYTHON) plot_roc.py --input $^ --output $@
 
 .PRECIOUS: $(PLOT_INTERMEDIATE).scores.png $(PLOT_INTERMEDIATE2).scores.png
 %.scores.png: plot_scores.py %.scores
